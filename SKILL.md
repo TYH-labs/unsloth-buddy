@@ -24,12 +24,53 @@ As a sub-skill orchestrator by `gaslamp`, you must uphold the unified project st
    - Maintain `unsloth-buddy/memory.md` for technical context (hyperparameters, dataset shapes, debugging discoveries).
    - Maintain `unsloth-buddy/progress_log.md` for a chronological record of your actions.
 
-## Prerequisites & Environment Check
+## Auto-Environment Setup & Installation
 
-Before writing any training scripts, verify the environment:
-1. **GPU Required**: Run `nvidia-smi` or check `torch.cuda.is_available()`. Unsloth requires NVIDIA GPUs (CUDA 7.0+). (AMD/Intel supported but require specific installs; see Unsloth docs).
-2. **Library Installation**: Ensure `unsloth` is installed (`pip show unsloth`). If not, the recommended install is: `pip install unsloth`.
-3. **Dependencies**: `torch`, `trl`, `transformers`, `datasets` are required.
+Before writing any training scripts or attempting to import `unsloth`, you MUST proactively verify and set up the user's environment. **Do not assume Unsloth is installed correctly, as it has strict version requirements.**
+
+### Step 1: Detect the Environment
+Use your terminal tools to figure out the user's exact environment footprint:
+1. **OS Check**: `uname -a` (Linux/Mac) or `systeminfo` (Windows). Unsloth currently does not support native Mac Silicon (M1/M2/M3) for training, only inference. If on Mac, suggest they use Colab or a cloud GPU.
+2. **GPU & CUDA Check**: Run `nvidia-smi` to get the CUDA version (e.g., CUDA 12.1) and device architecture (e.g., Ampere A100/RTX3090, Hopper, Ada). 
+3. **Python & Torch Check**:
+   ```bash
+   python -c "import torch; print(torch.__version__, torch.version.cuda)"
+   ```
+   Unsloth requires PyTorch >= 2.1.1. It supports CUDA 11.8, 12.1, and 12.4+.
+
+### Step 2: Select the Correct Installation Path
+Once you know their OS, CUDA version, and Torch version, run the appropriate setup. **Unsloth installation is highly specific.**
+
+**A. Standard Linux/WSL (Recommended default if Torch passes checks)**:
+```bash
+pip install unsloth
+```
+
+**B. Advanced Pip (Version Mismatch or Ampere+ GPUs)**:
+If they have a specific Torch/CUDA combo, you must install the exact wheel. 
+*Example for Torch 2.4 and CUDA 12.1 on an Ampere GPU (A100, RTX 30/40 series):*
+```bash
+pip install --upgrade pip
+pip install "unsloth[cu121-ampere-torch240] @ git+https://github.com/unslothai/unsloth.git"
+```
+*Tip: To auto-generate the optimal advanced pip string for the user's current environment, run this script:*
+```bash
+wget -qO- https://raw.githubusercontent.com/unslothai/unsloth/main/unsloth/_auto_install.py | python -
+```
+
+**C. Windows (Native)**:
+If on Windows, installation via Anaconda/Miniconda is highly recommended. 
+Guide the user to:
+1. Create environment: `conda create --name unsloth_env python==3.12 -y` & `conda activate unsloth_env`
+2. Install PyTorch according to their CUDA version (e.g. `pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`)
+3. Install Unsloth: `pip install unsloth`
+
+**D. Docker (The Easiest Route)**:
+If they have Docker and the NVIDIA Container Toolkit installed, you can skip all dependency hell:
+```bash
+docker run -d -p 8888:8888 -v $(pwd):/workspace/work --gpus all unsloth/unsloth
+```
+Tell them to access Jupyter Lab at `http://localhost:8888`.
 
 ## Key Directives
 
