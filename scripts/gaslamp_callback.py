@@ -37,10 +37,10 @@ class GaslampDashboardCallback(TrainerCallback):
         Called whenever `trainer.log()` is invoked (depends on logging_steps).
         """
         if state.is_world_process_zero:
-            self._render_dashboard(state.log_history)
+            self._render_dashboard(args, state)
 
-    def _render_dashboard(self, log_history: list):
-        """Reads the template, injects the new JSON, and writes the output file."""
+    def _render_dashboard(self, args: TrainingArguments, state: TrainerState):
+        """Bundles system/run metadata with logs and renders the HTML."""
         if not os.path.exists(self.template_path):
             print(f"⚠️ [Gaslamp Callback] Template not found at {self.template_path}. Using plain fallback.")
             html_content = self.fallback_template
@@ -48,10 +48,43 @@ class GaslampDashboardCallback(TrainerCallback):
             with open(self.template_path, "r", encoding="utf-8") as f:
                 html_content = f.read()
 
-        # Convert log history to a clean JSON string
+        # 1. Gather hardware stats
+        hardware_info = {"device": "Unknown", "peak_vram_mb": 0}
         try:
-            # Hugging Face logs can sometimes contain non-serializable objects (though mostly flots)
-            json_data = json.dumps(log_history, indent=2)
+            import torch
+            if torch.cuda.is_available():
+                hardware_info["device"] = torch.cuda.get_device_name(0)
+                # peak memory allocated in MB
+                hardware_info["peak_vram_mb"] = int(torch.cuda.max_memory_allocated() / (1024*1024))
+        except Exception:
+            pass
+
+        # 2. Extract key Hyperparameters
+        try:
+            hyperparams = {
+                "learning_rate": args.learning_rate,
+                "train_batch_size": args.train_batch_size,
+                "gradient_accumulation": args.gradient_accumulation_steps,
+                "optimizer": args.optim,
+                "seed": args.seed,
+            }
+        except:
+            hyperparams = {}
+
+        # 3. Create the payload
+        payload = {
+            "meta": {
+                "max_steps": state.max_steps,
+                "total_epochs": getattr(args, "num_train_epochs", 0),
+            },
+            "hardware": hardware_info,
+            "hyperparameters": hyperparams,
+            "logs": state.log_history,
+        }
+
+        # Convert to a clean JSON string
+        try:
+            json_data = json.dumps(payload, indent=2)
         except Exception as e:
             print(f"⚠️ [Gaslamp Callback] Failed to serialize logs: {e}")
             json_data = "[]"

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gaslamp | Real-Time Training Dashboard</title>
+    <title>Gaslamp | Comprehensive Training Dashboard</title>
     <!-- Auto-refresh every 5 seconds -->
     <meta http-equiv="refresh" content="5">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,7 +15,6 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #0f1115;
-            /* Dark Gaslamp background */
             color: #e5e7eb;
         }
 
@@ -25,7 +24,7 @@
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.18);
         }
 
         .gaslamp-gradient {
@@ -38,229 +37,411 @@
         .metric-value {
             font-variant-numeric: tabular-nums;
         }
+
+        /* Custom scrollbar for table */
+        ::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
     </style>
 </head>
 
 <body class="min-h-screen p-6 md:p-8">
 
-    <!-- Top Header -->
-    <header class="flex items-center justify-between mb-8 pb-4 border-b border-gray-800">
-        <div class="flex items-center space-x-3">
-            <!-- Gaslamp Logo Placeholder -->
-            <div
-                class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24"
-                    stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+    <!-- Header & Progress -->
+    <header class="mb-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-6 mb-6">
+            <div class="flex items-center space-x-4">
+                <div
+                    class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">Gaslamp <span class="text-gray-400 font-medium">|
+                            Unsloth Training</span></h1>
+                    <p class="text-sm text-gray-400 mt-1" id="last-updated">Updating real-time...</p>
+                </div>
             </div>
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight">Gaslamp <span class="text-gray-400 font-medium">| Unsloth
-                        Training</span></h1>
-                <p class="text-sm text-gray-400 mt-1" id="last-updated">Updating real-time...</p>
+
+            <div class="flex items-center space-x-4">
+                <div class="glass-panel px-4 py-2 flex items-center space-x-2 border-emerald-500/30">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-sm font-semibold text-emerald-400">Training Active</span>
+                </div>
             </div>
         </div>
 
-        <div class="flex space-x-4 text-sm font-medium">
-            <div class="glass-panel px-4 py-2 flex items-center space-x-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Training Active</span>
+        <!-- Global Progress Bar -->
+        <div class="glass-panel p-5">
+            <div class="flex justify-between text-sm font-medium mb-2">
+                <span class="text-gray-300">Overall Progress</span>
+                <span class="text-emerald-400" id="progress-text">0% (0 / 0 Steps)</span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
+                <div id="progress-bar"
+                    class="bg-gradient-to-r from-emerald-500 to-blue-500 h-2.5 rounded-full transition-all duration-500 ease-out"
+                    style="width: 0%"></div>
             </div>
         </div>
     </header>
 
-    <!-- Key Metrics Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" id="metrics-grid">
-        <!-- Rendered dynamically -->
+    <div class="grid grid-cols-1 xl:grid-cols-4 gap-6 mb-8">
+
+        <!-- Left Column: Metrics & Charts (Spans 3 cols) -->
+        <div class="xl:col-span-3 space-y-6">
+
+            <!-- Quick Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="metrics-grid">
+                <!-- Dynamically populated via JS -->
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Training Loss -->
+                <div class="glass-panel p-6">
+                    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Training Loss</h3>
+                    <div class="relative h-64"><canvas id="lossChart"></canvas></div>
+                </div>
+
+                <!-- Learning Rate -->
+                <div class="glass-panel p-6">
+                    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Learning Rate</h3>
+                    <div class="relative h-64"><canvas id="lrChart"></canvas></div>
+                </div>
+
+                <!-- Eval / Validation Metrics (Dynamic full width) -->
+                <div class="glass-panel p-6 md:col-span-2 hidden" id="evalChartContainer">
+                    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Evaluation Metrics
+                    </h3>
+                    <div class="relative h-72"><canvas id="evalChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: System & Config (Spans 1 col) -->
+        <div class="space-y-6">
+
+            <!-- Hardware / VRAM Stats -->
+            <div class="glass-panel p-6 bg-gradient-to-b from-gray-900 to-gray-800/80">
+                <div class="flex items-center space-x-3 mb-6">
+                    <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z">
+                        </path>
+                    </svg>
+                    <h3 class="text-lg font-semibold text-white">Hardware Utilization</h3>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-xs text-gray-400 mb-1">Active Device</p>
+                        <p class="text-sm font-medium text-gray-200" id="hw-device">Detecting...</p>
+                    </div>
+                    <div>
+                        <div class="flex items-baseline space-x-2">
+                            <p class="text-xs text-gray-400">Peak VRAM Allocated &nbsp;</p>
+                        </div>
+                        <div class="flex items-end space-x-1">
+                            <h2 class="text-3xl font-bold text-white metric-value" id="hw-vram">0</h2>
+                            <span class="text-sm text-gray-500 font-medium mb-1">MB</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hyperparameters -->
+            <div class="glass-panel p-6">
+                <div class="flex items-center space-x-3 mb-6">
+                    <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                        </path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <h3 class="text-lg font-semibold text-white">Hyperparameters</h3>
+                </div>
+
+                <div class="space-y-3 text-sm" id="hp-list">
+                    <!-- Populated via JS -->
+                    <p class="text-gray-500 italic">Waiting for config...</p>
+                </div>
+            </div>
+
+        </div>
     </div>
 
-    <!-- Charts Area -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="glass-panel p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-gray-200">Loss Curve</h3>
-            </div>
-            <div class="relative h-72">
-                <canvas id="lossChart"></canvas>
-            </div>
-        </div>
-
-        <div class="glass-panel p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-gray-200">Learning Rate</h3>
-            </div>
-            <div class="relative h-72">
-                <canvas id="lrChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Optional 3rd chart for GRPO reward or Eval Loss if present -->
-        <div class="glass-panel p-6 lg:col-span-2 hidden" id="extraChartContainer">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-gray-200" id="extraChartTitle">Secondary Metric</h3>
-            </div>
-            <div class="relative h-72">
-                <canvas id="extraChart"></canvas>
-            </div>
+    <!-- Recent Logs Table -->
+    <div class="glass-panel p-6 overflow-hidden">
+        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Recent Training Logs</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm whitespace-nowrap">
+                <thead class="text-xs text-gray-400 border-b border-gray-700/50">
+                    <tr id="table-head">
+                        <th class="px-4 py-3 font-medium">Step</th>
+                        <th class="px-4 py-3 font-medium">Loss</th>
+                        <th class="px-4 py-3 font-medium">Learn Rate</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body" class="divide-y divide-gray-800/50">
+                    <!-- Populated via JS -->
+                </tbody>
+            </table>
         </div>
     </div>
+
 
     <!-- DATA INJECTION TARGET -->
     <!-- Do not remove this comment block or alter the exact string below -->
     <script id="metrics-data">
-        window.TRAINING_DATA = __METRICS_DATA__;
+        window.TRAINING_PAYLOAD = __METRICS_DATA__;
     </script>
 
     <script>
-        // Fallback for demo/development if data not injected
-        if (typeof window.TRAINING_DATA === 'undefined' || window.TRAINING_DATA === '__METRICS_' + 'DATA__') {
-            window.TRAINING_DATA = [
-                { "step": 0, "loss": 2.10, "learning_rate": 0.00000 },
-                { "step": 10, "loss": 1.85, "learning_rate": 0.00005 },
-                { "step": 20, "loss": 1.45, "learning_rate": 0.00018 },
-                { "step": 30, "loss": 1.20, "learning_rate": 0.00020 },
-                { "step": 40, "loss": 1.05, "learning_rate": 0.00015 },
-                { "step": 50, "loss": 0.95, "learning_rate": 0.00010 }
-            ];
-            console.log("Using dummy data");
+        // Fallback dummy payload for local testing
+        if (typeof window.TRAINING_PAYLOAD === 'undefined' || window.TRAINING_PAYLOAD === '__METRICS_' + 'DATA__') {
+            window.TRAINING_PAYLOAD = {
+                "meta": { "max_steps": 100, "total_epochs": 1.0 },
+                "hardware": { "device": "NVIDIA RTX 4090", "peak_vram_mb": 14502 },
+                "hyperparameters": { "learning_rate": 0.0002, "train_batch_size": 2, "gradient_accumulation": 4, "optimizer": "adamw_8bit" },
+                "logs": [
+                    { "step": 10, "epoch": 0.1, "loss": 2.10, "learning_rate": 0.00005, "eval_loss": 2.00, "eval_accuracy": 0.35 },
+                    { "step": 20, "epoch": 0.2, "loss": 1.85, "learning_rate": 0.00015 },
+                    { "step": 30, "epoch": 0.3, "loss": 1.45, "learning_rate": 0.00020, "eval_loss": 1.50, "eval_accuracy": 0.55 },
+                    { "step": 40, "epoch": 0.4, "loss": 1.20, "learning_rate": 0.00015 },
+                    { "step": 50, "epoch": 0.5, "loss": 1.05, "learning_rate": 0.00010, "eval_loss": 1.10, "eval_accuracy": 0.65 }
+                ]
+            };
+            console.log("Using dummy payload data");
         }
 
-        const data = window.TRAINING_DATA;
+        const payload = window.TRAINING_PAYLOAD;
+        const logs = payload.logs || [];
+        const meta = payload.meta || {};
+        const hw = payload.hardware || {};
+        const hp = payload.hyperparameters || {};
 
-        if (data && data.length > 0) {
-            const latest = data[data.length - 1];
+        if (logs.length > 0) {
+            const latest = logs[logs.length - 1];
 
-            // 1. Update timestamp
+            // 1. Header & Context Updates
             document.getElementById('last-updated').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
 
-            // 2. Populate Metrics Grid
-            const grid = document.getElementById('metrics-grid');
+            document.getElementById('hw-device').textContent = hw.device || "Unknown";
+            document.getElementById('hw-vram').textContent = hw.peak_vram_mb ? hw.peak_vram_mb.toLocaleString() : "0";
 
+            // Render Hyperparameters
+            let hpHTML = '';
+            for (const [key, val] of Object.entries(hp)) {
+                if (val !== null && val !== undefined) {
+                    hpHTML += `
+                    <div class="flex justify-between border-b border-gray-800/50 pb-2">
+                        <span class="text-gray-400 capitalize">${key.replace(/_/g, ' ')}</span>
+                        <span class="font-medium text-gray-200">${typeof val === 'number' && val < 0.01 ? val.toExponential(2) : val}</span>
+                    </div>`;
+                }
+            }
+            if (hpHTML) document.getElementById('hp-list').innerHTML = hpHTML;
+
+            // Compute Progress
+            if (meta.max_steps && latest.step) {
+                const pct = Math.min(100, Math.round((latest.step / meta.max_steps) * 100));
+                document.getElementById('progress-bar').style.width = `${pct}%`;
+                document.getElementById('progress-text').textContent = `${pct}% (${latest.step} / ${meta.max_steps} Steps)`;
+            }
+
+            // 2. Metrics Grid
+            const grid = document.getElementById('metrics-grid');
             const createCard = (label, value, suffix = "") => `
-                <div class="glass-panel p-5 relative overflow-hidden group">
-                    <div class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <svg class="h-10 w-10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd"></path></svg>
+                <div class="glass-panel p-5 relative overflow-hidden group border-gray-800 hover:border-emerald-500/30 transition-colors">
+                    <div class="absolute -right-4 -bottom-4 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity">
+                        <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                     <p class="text-sm font-medium text-gray-400 mb-1">${label}</p>
                     <div class="flex items-baseline space-x-1">
-                        <h2 class="text-3xl font-bold text-white metric-value tracking-tight">${value}</h2>
-                        ${suffix ? `<span class="text-sm text-gray-500 font-medium">${suffix}</span>` : ''}
+                        <h2 class="text-3xl font-bold text-white metric-value tracking-tight shadow-sm">${value}</h2>
+                        ${suffix ? `<span class="text-xs text-gray-500 font-medium">${suffix}</span>` : ''}
                     </div>
                 </div>
             `;
 
             let gridHtml = '';
-
-            // Common metrics
-            if ('step' in latest) gridHtml += createCard('Global Step', latest.step);
-            if ('epoch' in latest) gridHtml += createCard('Epoch', latest.epoch.toFixed(2));
+            if ('epoch' in latest) gridHtml += createCard('Current Epoch', latest.epoch.toFixed(2));
             if ('loss' in latest) gridHtml += createCard('Training Loss', latest.loss.toFixed(4));
-            if ('learning_rate' in latest) gridHtml += createCard('Learning Rate', latest.learning_rate.toExponential(2));
-            if ('reward' in latest) gridHtml += createCard('Reward (GRPO)', latest.reward.toFixed(4));
-            if ('eval_loss' in latest) gridHtml += createCard('Eval Loss', latest.eval_loss.toFixed(4));
 
+            // Find the most recent eval metrics to display in top cards
+            const evalLogs = logs.filter(l => Object.keys(l).some(k => k.startsWith('eval_')));
+            if (evalLogs.length > 0) {
+                const latestEval = evalLogs[evalLogs.length - 1];
+                if ('eval_loss' in latestEval) gridHtml += createCard('Latest Eval Loss', latestEval.eval_loss.toFixed(4));
+                if ('eval_accuracy' in latestEval) gridHtml += createCard('Eval Accuracy', (latestEval.eval_accuracy * 100).toFixed(1), "%");
+            } else if ('learning_rate' in latest) {
+                gridHtml += createCard('Learning Rate', latest.learning_rate.toExponential(2));
+            }
             grid.innerHTML = gridHtml;
 
             // 3. Render Charts
             Chart.defaults.color = '#9ca3af';
             Chart.defaults.font.family = "'Inter', sans-serif";
 
-            const commonOptions = {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
+            const lineOptions = {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
                 scales: {
-                    x: {
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' }
-                    },
-                    y: {
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        beginAtZero: true
-                    }
+                    x: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { maxTicksLimit: 10 } },
+                    y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, beginAtZero: false }
                 },
-                elements: {
-                    line: { tension: 0.4, borderWidth: 2 },
-                    point: { radius: 2, hoverRadius: 5 }
-                },
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                }
+                elements: { line: { tension: 0.3, borderWidth: 2 }, point: { radius: 1, hoverRadius: 4 } },
+                interaction: { mode: 'index', intersect: false }
             };
 
-            const steps = data.map(d => d.step);
+            const steps = logs.map(d => d.step);
 
-            // Loss Chart
-            if (data.some(d => 'loss' in d)) {
+            // Training Loss Chart
+            if (logs.some(d => 'loss' in d)) {
                 new Chart(document.getElementById('lossChart'), {
                     type: 'line',
                     data: {
                         labels: steps,
                         datasets: [{
-                            label: 'Training Loss',
-                            data: data.map(d => d.loss),
-                            borderColor: '#3b82f6',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            fill: true
+                            label: 'Training Loss', data: logs.map(d => d.loss),
+                            borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true
                         }]
                     },
-                    options: commonOptions
+                    options: lineOptions
                 });
             }
 
-            // LR Chart
-            if (data.some(d => 'learning_rate' in d)) {
+            // Learning Rate Chart
+            if (logs.some(d => 'learning_rate' in d)) {
                 new Chart(document.getElementById('lrChart'), {
                     type: 'line',
                     data: {
                         labels: steps,
                         datasets: [{
-                            label: 'Learning Rate',
-                            data: data.map(d => d.learning_rate),
-                            borderColor: '#10b981',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            fill: true
+                            label: 'Learning Rate', data: logs.map(d => d.learning_rate),
+                            borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true
                         }]
                     },
-                    options: commonOptions
+                    options: lineOptions
                 });
             }
 
-            // Extra Chart (Reward or Eval Loss)
-            const hasReward = data.some(d => 'reward' in d);
-            const hasEval = data.some(d => 'eval_loss' in d);
+            // Dynamic Eval Charting (finds anything starting with eval_)
+            if (evalLogs.length > 0) {
+                document.getElementById('evalChartContainer').classList.remove('hidden');
 
-            if (hasReward || hasEval) {
-                document.getElementById('extraChartContainer').classList.remove('hidden');
+                // Collect all dynamic eval keys (eval_loss, eval_accuracy, eval_f1, etc)
+                const evalKeys = new Set();
+                evalLogs.forEach(l => {
+                    Object.keys(l).forEach(k => { if (k.startsWith('eval_')) evalKeys.add(k); });
+                });
 
-                const metricKey = hasReward ? 'reward' : 'eval_loss';
-                const metricLabel = hasReward ? 'GRPO Reward' : 'Evaluation Loss';
-                const metricColor = hasReward ? '#f59e0b' : '#8b5cf6'; // amber or purple
+                const evalDatasets = [];
+                const colors = ['#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4']; // Amber, Purple, Pink, Cyan
+                let colorIdx = 0;
 
-                document.getElementById('extraChartTitle').textContent = metricLabel;
+                evalKeys.forEach(key => {
+                    // Extract data points ensuring we skip nulls by mapping Step:Val
+                    const dataPoints = [];
+                    evalLogs.forEach(l => {
+                        if (key in l && l[key] !== null) {
+                            dataPoints.push({ x: l.step, y: l[key] });
+                        }
+                    });
 
-                // Filter out nulls for eval loss (since it logs less frequently)
-                const extraData = data.filter(d => metricKey in d && d[metricKey] !== null);
+                    // Only add if we actually have data
+                    if (dataPoints.length > 0) {
+                        const color = colors[colorIdx % colors.length];
+                        evalDatasets.push({
+                            label: key.replace('eval_', '').replace('_', ' ').toUpperCase(),
+                            data: dataPoints,
+                            borderColor: color,
+                            backgroundColor: color.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+                            spanGaps: true,
+                            tension: 0.1,
+                            yAxisID: key.includes('loss') ? 'y_loss' : 'y_metric', // split scales
+                            borderWidth: 3,
+                            pointRadius: 4
+                        });
+                        colorIdx++;
+                    }
+                });
 
-                new Chart(document.getElementById('extraChart'), {
+                const dynamicEvalOptions = JSON.parse(JSON.stringify(lineOptions));
+                dynamicEvalOptions.plugins.legend = { display: true, position: 'top', labels: { usePointStyle: true, boxWidth: 6 } };
+                // Setup multi-axis if there are both loss and other metrics (like accuracy)
+                const needsDualAxis = evalDatasets.some(d => d.yAxisID === 'y_loss') && evalDatasets.some(d => d.yAxisID === 'y_metric');
+
+                dynamicEvalOptions.scales = {
+                    x: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, type: 'linear', title: { display: true, text: 'Step', color: '#6b7280' } },
+                    y_loss: { type: 'linear', display: evalDatasets.some(d => d.yAxisID === 'y_loss'), position: 'left', grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                    y_metric: { type: 'linear', display: evalDatasets.some(d => d.yAxisID === 'y_metric'), position: 'right', grid: { drawOnChartArea: false } }
+                };
+
+                new Chart(document.getElementById('evalChart'), {
                     type: 'line',
-                    data: {
-                        labels: extraData.map(d => d.step),
-                        datasets: [{
-                            label: metricLabel,
-                            data: extraData.map(d => d[metricKey]),
-                            borderColor: metricColor,
-                            backgroundColor: metricColor.replace(')', ', 0.1)').replace('rgb', 'rgba'),
-                            fill: true,
-                            spanGaps: true
-                        }]
-                    },
-                    options: commonOptions
+                    data: { datasets: evalDatasets },
+                    options: dynamicEvalOptions
                 });
             }
+
+            // 4. Render Log Table (Reverse chronological, max 15 rows)
+            // Dynamically build columns based on what keys exist in the logs
+            const allKeys = new Set(['step']);
+            logs.forEach(l => Object.keys(l).forEach(k => {
+                if (k !== 'step' && k !== 'epoch' && typeof l[k] === 'number') allKeys.add(k);
+            }));
+
+            // Priority ordering for headers
+            const sortedKeys = ['step', 'loss', 'learning_rate'];
+            allKeys.forEach(k => { if (!sortedKeys.includes(k)) sortedKeys.push(k); });
+
+            // Build Head
+            const thead = document.getElementById('table-head');
+            thead.innerHTML = sortedKeys.map(k => `<th class="px-4 py-3 font-medium capitalize">${k.replace(/_/g, ' ')}</th>`).join('');
+
+            // Build Body (last 15 items, reversed)
+            const tbody = document.getElementById('table-body');
+            const recentLogs = [...logs].reverse().slice(0, 15);
+
+            let tbodyHTML = '';
+            recentLogs.forEach((logRow, i) => {
+                const bgClass = i % 2 === 0 ? 'bg-transparent' : 'bg-gray-800/20';
+                let trContent = '';
+
+                sortedKeys.forEach(k => {
+                    let val = logRow[k];
+                    let displayStr = '-';
+                    if (val !== undefined && val !== null) {
+                        displayStr = (k === 'step') ? val :
+                            (k === 'learning_rate' || val < 0.001) ? val.toExponential(3) :
+                                val.toFixed(4);
+                    }
+                    trContent += `<td class="px-4 py-3 text-gray-300 font-mono text-[0.8rem]">${displayStr}</td>`;
+                });
+
+                tbodyHTML += `<tr class="${bgClass} hover:bg-gray-800/40 transition-colors">${trContent}</tr>`;
+            });
+            tbody.innerHTML = tbodyHTML;
         }
     </script>
 </body>
