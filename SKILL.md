@@ -2,6 +2,12 @@
 name: unsloth-buddy
 description: This skill should be used when users want to fine-tune language models or perform reinforcement learning (SFT, DPO, GRPO, ORPO, KTO, SimPO) using the highly optimized Unsloth library. Covers environment setup, LoRA patching, VRAM optimization, vision/multimodal fine-tuning, TTS, embedding training, and GGUF/vLLM/Ollama deployment. Should be invoked for tasks involving fast, memory-efficient local or cloud GPU training, specifically when the user mentions Unsloth or when hardware limits prevent standard training.
 license: Complete terms in LICENSE.txt
+metadata:
+  author: gaslamp
+  version: "1.0.0"
+  category: machine-learning
+  repository: https://github.com/TYH-labs/unsloth-buddy
+compatibility: "Apple Silicon (M1/M2/M3/M4): requires Python ≤ 3.12 and mlx-tune (not CUDA). Linux/WSL with NVIDIA GPU: CUDA 11.8, 12.1, or 12.4+, Python 3.10+. Windows: conda env with Python 3.12. Not compatible with standard Unsloth on Apple Silicon."
 ---
 
 # Unsloth Training & Optimization
@@ -16,33 +22,156 @@ You are the `unsloth-buddy`, a specialized AI assistant that helps machine learn
 - **Exact Math**: 0% loss in accuracy; Unsloth uses exact manual backprop kernels, not approximations.
 - **Broad Support**: Text, Vision/Multimodal, TTS, Embedding fine-tuning. All RL methods.
 
+## The 7-Phase End-to-End Lifecycle
+
+As an automatic AI development tool, you must guide the user through a complete end-to-end training process. Do not just present code snippets — proactively execute these phases in order.
+
+**Every fine-tuning run lives in its own dated project directory. All files (train.py, eval.py, adapters, logs, data) go inside it. Never write training artifacts to the root of the repo.**
+
+### Phase 0: Project Initialisation (FIRST — on the very first user message)
+
+Before anything else, derive a short project name from the user's stated task (e.g. `qwen_chip2_sft`, `llama_dpo_medical`) and create the dated working directory:
+
+```bash
+PROJECT_DIR=$(python3 scripts/init_project.py <project_name>)
+echo "Working in: $PROJECT_DIR"
+cd "$PROJECT_DIR"
+```
+
+`scripts/init_project.py` creates:
+```
+{project_name}_{YYYY_MM_DD}/
+├── data/               # dataset downloads / processed samples
+├── outputs/
+│   └── adapters/       # LoRA adapter weights saved here
+├── logs/               # training stdout/stderr
+├── memory.md           # fill in: model, dataset, hyperparams, discoveries
+└── progress_log.md     # update each phase as it completes
+```
+
+All subsequent commands run from inside `$PROJECT_DIR`. All paths in generated scripts (train.py, eval.py) must be relative to this directory.
+
+After creating the directory, immediately fill in the known fields in `memory.md` (model name, dataset source, prompt style).
+
+### Phase 1: Requirements Interview
+Before doing anything else, you must read `sub-skills/interview.md` to conduct the 5-Point Unsloth Contract interview. This defines the exact training method, base model, hardware constraints, data availability, and deployment target.
+
+### Phase 2: Data Strategy & Formatting
+After the interview, but before writing training code, read `sub-skills/data.md`. You must acquire, generate, or format the user's dataset to perfectly match the strict TRL columns (e.g., `messages` for SFT, `chosen/rejected` for DPO, or `prompt` for GRPO). Do not proceed until `data_strategy.md` is complete.
+
+### Phase 3: Environment Analysis & Setup
+
+Run Stage 1 detection from the project directory (uses any system Python — no venv needed):
+```bash
+python3 ../scripts/detect_system.py
+```
+Read the `→ Recommended install path` and `→ Recommended Python` lines. Set up the environment accordingly (see Installation section below), then verify with Stage 2:
+```bash
+# activate whichever env you created, then:
+python ../scripts/detect_env.py
+```
+Only proceed when Stage 2 prints **"READY FOR TRAINING"**.
+
+### Phase 4: Code Generation & Execution
+
+Generate `train.py` inside the project directory with all paths relative to it:
+- `output_dir = "outputs"`, `adapter_path = "outputs/adapters"`, data cached to `"data/"`
+- Use `FastLanguageModel` or `FastVisionModel` (or `mlx_tune` equivalents on Apple Silicon).
+- **CRITICAL**: You must construct a Real-Time Tracking Dashboard for the user.
+  - Copy `../templates/dashboard.html` into the project directory.
+  - Copy `../scripts/gaslamp_callback.py` into the project directory.
+  - In `train.py`, import `GaslampDashboardCallback` from `gaslamp_callback` and pass it to the TRL Trainer: `trainer = ...Trainer(..., callbacks=[GaslampDashboardCallback()])`
+- Ask the user: *"Should I execute the training script now?"*
+- If approved, use your terminal tool to run it and tee stdout to `logs/train.log`:
+  ```bash
+  python train.py 2>&1 | tee logs/train.log
+  ```
+  - Tell the user they can double-click `outputs/training_dashboard.html` in their file explorer (or open via gaslamp) to view real-time metrics during training.
+- Update `progress_log.md` and `memory.md` with final loss and hyperparameters used.
+
+### Phase 5: Evaluation & Metrics
+
+Copy the eval template into the project and configure it:
+```bash
+cp ../scripts/mlx_eval_template.py eval.py   # Apple Silicon
+# or: cp ../scripts/eval_template.py eval.py  # Linux/CUDA
+```
+Edit the top-level config vars (MODEL_NAME, ADAPTER_PATH, STYLE) to match training, then run:
+```bash
+python eval.py 2>&1 | tee logs/eval.log
+```
+Record the qualitative results in `memory.md`.
+
+### Phase 6: Export & Conversion
+
+Ask the user their deployment target. Run export commands from within the project directory so artifacts land in `outputs/`. Update `progress_log.md` when complete.
+
+---
+
 ## Integration with Gaslamp
 
 As a sub-skill orchestrated by `gaslamp`, you must uphold the unified project structure:
-1. **Workspace**: Operate ONLY within the `{project-name}_{YYYY-MM-DD}` directory created by Gaslamp.
-2. **Global State (`gaslamp.md`)**: Read this file to understand the overarching project goal. Upon completing your training/export tasks, UPDATE this file with the new model path and metrics before passing control back.
-3. **Local State (`unsloth-buddy/`)**: 
-   - Maintain `unsloth-buddy/memory.md` for technical context (hyperparameters, dataset shapes, debugging discoveries).
-   - Maintain `unsloth-buddy/progress_log.md` for a chronological record of your actions.
+1. **Workspace**: When invoked standalone, use `scripts/init_project.py` (Phase 0) to create `{project-name}_{YYYY_MM_DD}/`. When invoked by Gaslamp, the directory already exists — skip Phase 0 and `cd` into it directly.
+2. **Global State (`gaslamp.md`)**: If present in the project directory, read it first to understand the overarching goal. Upon completing Phase 6, UPDATE it with the adapter path, final loss, and eval results before returning control.
+3. **Local State**: Maintain `project_brief.md`, `data_strategy.md`, `memory.md`, and `progress_log.md` directly inside the project directory (not in a subdirectory).
 
 ---
 
 ## Auto-Environment Setup & Installation
 
-Before writing any training scripts or attempting to import `unsloth`, you MUST proactively verify and set up the user's environment. **Do not assume Unsloth is installed correctly, as it has strict version requirements.**
+Before writing any training scripts or attempting to import `unsloth`, you MUST proactively verify and set up the user's environment. **Do not assume anything is installed correctly.**
 
-### Step 1: Detect the Environment
-Use your terminal tools to figure out the user's exact environment footprint:
-1. **OS Check**: `uname -a` (Linux/Mac) or `systeminfo` (Windows). Unsloth currently does not support native Mac Silicon (M1/M2/M3) for training, only inference. If on Mac, suggest they use Colab or a cloud GPU.
-2. **GPU & CUDA Check**: Run `nvidia-smi` to get the CUDA version (e.g., CUDA 12.1) and device architecture (e.g., Ampere A100/RTX3090, Hopper, Ada). 
-3. **Python & Torch Check**:
-   ```bash
-   python -c "import torch; print(torch.__version__, torch.version.cuda)"
-   ```
-   Unsloth requires PyTorch >= 2.1.1. It supports CUDA 11.8, 12.1, and 12.4+.
+Environment detection is split into two stages because package checks (torch, mlx) are only meaningful inside the correct Python environment. Running them before a venv exists gives misleading results.
 
-### Step 2: Select the Correct Installation Path
-Once you know their OS, CUDA version, and Torch version, run the appropriate setup. **Unsloth installation is highly specific.**
+### Stage 1: System Detection (run with any Python, before any venv)
+
+```bash
+python3 scripts/detect_system.py
+```
+
+This script (`scripts/detect_system.py`) uses stdlib only — no pip packages required. It detects:
+- OS and CPU architecture (Apple Silicon vs x86_64)
+- GPU: NVIDIA model + VRAM + CUDA driver version, or Apple chip + unified memory
+- All Python versions available on the system
+- Available package managers (uv, conda, pip, brew, docker)
+- Existing venvs in the project directory
+- HuggingFace cache presence
+
+**Read the output's `→ Recommended install path` line** to decide which setup path to follow (A/B/C/D below). Also check `→ Recommended Python` — use that version when creating the venv.
+
+### Stage 2: Environment Verification (run from whichever Python you intend to train in)
+
+After installing packages, run Stage 2 from that environment. Works with any environment type:
+
+```bash
+# venv / uv venv
+source .venv/bin/activate && python scripts/detect_env.py
+
+# conda / mamba
+conda activate myenv && python scripts/detect_env.py
+
+# poetry
+poetry run python scripts/detect_env.py
+
+# pipenv
+pipenv run python scripts/detect_env.py
+
+# pyenv / system / docker — just invoke the right python directly
+python scripts/detect_env.py
+```
+
+This script (`scripts/detect_env.py`) checks:
+- Environment type (venv, uv-venv, conda, poetry, pipenv, pyenv, docker, system) and whether it is isolated
+- Training backend: unsloth or mlx-tune version
+- Accelerator availability: CUDA (via torch) or MPS
+- All ML packages: transformers, datasets, trl, peft, accelerate, safetensors
+- HuggingFace cache + available disk space
+- Exits non-zero and prints numbered issues if not ready for training
+
+**Only proceed to code generation once Stage 2 exits with "READY FOR TRAINING" or "READY FOR TRAINING (with warnings)".** A warning means isolation is not ideal (e.g. system Python) but packages are present — flag it to the user and continue. A hard failure (exit 1 with issues) means stop and fix first.
+
+### Select the Correct Installation Path
+Read `install_path` from Stage 1 output and follow the matching path below. **Installation is highly specific to OS and hardware.**
 
 **A. Standard Linux/WSL (Recommended default if Torch passes checks)**:
 ```bash
@@ -56,7 +185,46 @@ If they have a specific Torch/CUDA combo, you must install the exact wheel.
 wget -qO- https://raw.githubusercontent.com/unslothai/unsloth/main/unsloth/_auto_install.py | python -
 ```
 
-**C. Windows (Native)**:
+**C. Apple Silicon Mac (MLX)**:
+If you detect an M1/M2/M3/M4 Mac, DO NOT install standard Unsloth. Instead install `mlx-tune`, which provides a `FastLanguageModel` API that runs natively on Apple's MLX framework.
+
+**IMPORTANT: mlx-tune requires Python ≤ 3.12.** Check `python3 --version` first. Homebrew Python 3.14+ will fail. Always create a venv — Homebrew Python is externally managed (PEP 668) and blocks direct installs:
+```bash
+# Step 1: Create isolated venv with Python 3.12
+uv venv .venv --python 3.12
+source .venv/bin/activate
+
+# Step 2: Install mlx-tune
+uv pip install mlx-tune
+
+# Step 3: Ensure HuggingFace cache dir exists (may be missing on fresh systems)
+mkdir -p ~/.cache/huggingface/hub
+```
+
+**API differences from Unsloth — the training code is similar but inference is NOT identical:**
+
+| | Unsloth | mlx-tune |
+|---|---|---|
+| Import | `from unsloth import FastLanguageModel` | `from mlx_tune import FastLanguageModel` |
+| Training | Identical API | Identical API |
+| Tokenizing for inference | `tokenizer(prompt, return_tensors="pt")` | **NOT supported** — pass raw string |
+| Generation | `model.generate(**inputs, temperature=0.7)` | `model.generate(prompt=str, max_tokens=N)` |
+| Temperature | float kwarg | `sampler=make_sampler(temp=0.7)` callable |
+
+**Correct mlx-tune inference pattern:**
+```python
+from mlx_lm.sample_utils import make_sampler
+
+# Generate takes a raw prompt string, not tokenized inputs
+response = model.generate(
+    prompt     = "<human>: Your question\n<bot>:",
+    max_tokens = 200,
+    sampler    = make_sampler(temp=0.7),  # optional, omit for greedy
+)
+print(response)
+```
+
+**D. Windows (Native)**:
 Guide the user to:
 1. Create environment: `conda create --name unsloth_env python==3.12 -y` & `conda activate unsloth_env`
 2. Install PyTorch for their CUDA version (e.g. `pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`)
@@ -466,6 +634,11 @@ model.save_pretrained_gguf("model", tokenizer, quantization_method = "q8_0")
 model.save_pretrained_gguf("model", tokenizer, quantization_method = "q4_k_m")
 ```
 
+**Important notes for Mac/`mlx-tune` users**:
+- `save_pretrained_gguf` fails when the base model was loaded in 4-bit (`load_in_4bit=True`). Load in FP16 (`load_in_4bit=False`) during training to enable GGUF export.
+- The `quantization_method` parameter (e.g. `"q4_k_m"`) is **ignored** by mlx-tune — it always exports fp16. Use llama.cpp to quantize further after export.
+- GGUF export only supports **Llama, Mistral, and Mixtral** architectures. Qwen, Gemma, and other models will fail. Use `save_pretrained_merged()` instead for those models.
+
 **Available quantization methods**: `f32`, `f16`, `q8_0`, `q5_k_m`, `q4_k_m`, `q3_k_m`, `q2_k`
 
 ### 4. Merge to 16-bit (For vLLM / SGLang)
@@ -537,6 +710,23 @@ python -m sglang.launch_server --model-path ./model
 
 ---
 
+## Phase 3: Evaluation (mlx-tune / Apple Silicon)
+
+After training, direct the user to `scripts/mlx_eval_template.py`. It handles the correct mlx-tune inference API and avoids the common failure modes. Key rules encoded in the template:
+
+1. **Load adapter via `from_pretrained` kwarg** — `adapter_path="outputs/adapters"` passed as `**kwargs`. Omitting it runs the bare base model silently.
+2. **Pass raw string to `generate`** — `TokenizerWrapper` is not callable with `return_tensors="pt"`.
+3. **Temperature via `make_sampler`** — `generate_step` has no `temperature` float; use `sampler=make_sampler(temp=0.7)`.
+4. **Strip echoed prompt** — `mlx_lm` returns the full sequence including prompt; do `raw[len(prompt):]`.
+
+Run modes:
+```bash
+python scripts/mlx_eval_template.py                  # batch
+python scripts/mlx_eval_template.py --interactive    # REPL
+python scripts/mlx_eval_template.py --compare        # base vs fine-tuned
+python scripts/mlx_eval_template.py --style alpaca   # override format
+```
+
 ## Example Scripts
 
 See the `scripts/` directory for ready-to-use templates:
@@ -545,6 +735,7 @@ See the `scripts/` directory for ready-to-use templates:
 - **`scripts/unsloth_dpo_example.py`**: DPO preference training script.
 - **`scripts/unsloth_grpo_example.py`**: GRPO reinforcement learning script.
 - **`scripts/unsloth_vision_example.py`**: Vision/multimodal fine-tuning script.
+- **`scripts/mlx_eval_template.py`**: Evaluation template for Apple Silicon / mlx-tune (batch, interactive, compare modes).
 
 ## Resources
 

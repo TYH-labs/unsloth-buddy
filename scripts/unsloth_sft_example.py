@@ -11,6 +11,12 @@ from trl import SFTTrainer, SFTConfig
 from datasets import load_dataset
 import os
 
+try:
+    from gaslamp_callback import GaslampDashboardCallback
+    callbacks = [GaslampDashboardCallback()]
+except ImportError:
+    callbacks = []
+
 def main():
     # 1. Configuration
     max_seq_length = 2048 # Supports RoPE Scaling internally
@@ -94,6 +100,7 @@ def main():
             output_dir = "outputs",
             report_to="none", # Change to "wandb" or "trackio" as needed
         ),
+        callbacks = callbacks,
     )
 
     # 6. Execute Training

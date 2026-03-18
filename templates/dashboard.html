@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaslamp | Real-Time Training Dashboard</title>
+    <!-- Auto-refresh every 5 seconds -->
+    <meta http-equiv="refresh" content="5">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f1115;
+            /* Dark Gaslamp background */
+            color: #e5e7eb;
+        }
+
+        .glass-panel {
+            background: rgba(30, 33, 40, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .gaslamp-gradient {
+            background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .metric-value {
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen p-6 md:p-8">
+
+    <!-- Top Header -->
+    <header class="flex items-center justify-between mb-8 pb-4 border-b border-gray-800">
+        <div class="flex items-center space-x-3">
+            <!-- Gaslamp Logo Placeholder -->
+            <div
+                class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">Gaslamp <span class="text-gray-400 font-medium">| Unsloth
+                        Training</span></h1>
+                <p class="text-sm text-gray-400 mt-1" id="last-updated">Updating real-time...</p>
+            </div>
+        </div>
+
+        <div class="flex space-x-4 text-sm font-medium">
+            <div class="glass-panel px-4 py-2 flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Training Active</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Key Metrics Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" id="metrics-grid">
+        <!-- Rendered dynamically -->
+    </div>
+
+    <!-- Charts Area -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="glass-panel p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-200">Loss Curve</h3>
+            </div>
+            <div class="relative h-72">
+                <canvas id="lossChart"></canvas>
+            </div>
+        </div>
+
+        <div class="glass-panel p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-200">Learning Rate</h3>
+            </div>
+            <div class="relative h-72">
+                <canvas id="lrChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Optional 3rd chart for GRPO reward or Eval Loss if present -->
+        <div class="glass-panel p-6 lg:col-span-2 hidden" id="extraChartContainer">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-200" id="extraChartTitle">Secondary Metric</h3>
+            </div>
+            <div class="relative h-72">
+                <canvas id="extraChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- DATA INJECTION TARGET -->
+    <!-- Do not remove this comment block or alter the exact string below -->
+    <script id="metrics-data">
+        window.TRAINING_DATA = __METRICS_DATA__;
+    </script>
+
+    <script>
+        // Fallback for demo/development if data not injected
+        if (typeof window.TRAINING_DATA === 'undefined' || window.TRAINING_DATA === '__METRICS_' + 'DATA__') {
+            window.TRAINING_DATA = [
+                { "step": 0, "loss": 2.10, "learning_rate": 0.00000 },
+                { "step": 10, "loss": 1.85, "learning_rate": 0.00005 },
+                { "step": 20, "loss": 1.45, "learning_rate": 0.00018 },
+                { "step": 30, "loss": 1.20, "learning_rate": 0.00020 },
+                { "step": 40, "loss": 1.05, "learning_rate": 0.00015 },
+                { "step": 50, "loss": 0.95, "learning_rate": 0.00010 }
+            ];
+            console.log("Using dummy data");
+        }
+
+        const data = window.TRAINING_DATA;
+
+        if (data && data.length > 0) {
+            const latest = data[data.length - 1];
+
+            // 1. Update timestamp
+            document.getElementById('last-updated').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+
+            // 2. Populate Metrics Grid
+            const grid = document.getElementById('metrics-grid');
+
+            const createCard = (label, value, suffix = "") => `
+                <div class="glass-panel p-5 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <svg class="h-10 w-10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd"></path></svg>
+                    </div>
+                    <p class="text-sm font-medium text-gray-400 mb-1">${label}</p>
+                    <div class="flex items-baseline space-x-1">
+                        <h2 class="text-3xl font-bold text-white metric-value tracking-tight">${value}</h2>
+                        ${suffix ? `<span class="text-sm text-gray-500 font-medium">${suffix}</span>` : ''}
+                    </div>
+                </div>
+            `;
+
+            let gridHtml = '';
+
+            // Common metrics
+            if ('step' in latest) gridHtml += createCard('Global Step', latest.step);
+            if ('epoch' in latest) gridHtml += createCard('Epoch', latest.epoch.toFixed(2));
+            if ('loss' in latest) gridHtml += createCard('Training Loss', latest.loss.toFixed(4));
+            if ('learning_rate' in latest) gridHtml += createCard('Learning Rate', latest.learning_rate.toExponential(2));
+            if ('reward' in latest) gridHtml += createCard('Reward (GRPO)', latest.reward.toFixed(4));
+            if ('eval_loss' in latest) gridHtml += createCard('Eval Loss', latest.eval_loss.toFixed(4));
+
+            grid.innerHTML = gridHtml;
+
+            // 3. Render Charts
+            Chart.defaults.color = '#9ca3af';
+            Chart.defaults.font.family = "'Inter', sans-serif";
+
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        beginAtZero: true
+                    }
+                },
+                elements: {
+                    line: { tension: 0.4, borderWidth: 2 },
+                    point: { radius: 2, hoverRadius: 5 }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            };
+
+            const steps = data.map(d => d.step);
+
+            // Loss Chart
+            if (data.some(d => 'loss' in d)) {
+                new Chart(document.getElementById('lossChart'), {
+                    type: 'line',
+                    data: {
+                        labels: steps,
+                        datasets: [{
+                            label: 'Training Loss',
+                            data: data.map(d => d.loss),
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true
+                        }]
+                    },
+                    options: commonOptions
+                });
+            }
+
+            // LR Chart
+            if (data.some(d => 'learning_rate' in d)) {
+                new Chart(document.getElementById('lrChart'), {
+                    type: 'line',
+                    data: {
+                        labels: steps,
+                        datasets: [{
+                            label: 'Learning Rate',
+                            data: data.map(d => d.learning_rate),
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true
+                        }]
+                    },
+                    options: commonOptions
+                });
+            }
+
+            // Extra Chart (Reward or Eval Loss)
+            const hasReward = data.some(d => 'reward' in d);
+            const hasEval = data.some(d => 'eval_loss' in d);
+
+            if (hasReward || hasEval) {
+                document.getElementById('extraChartContainer').classList.remove('hidden');
+
+                const metricKey = hasReward ? 'reward' : 'eval_loss';
+                const metricLabel = hasReward ? 'GRPO Reward' : 'Evaluation Loss';
+                const metricColor = hasReward ? '#f59e0b' : '#8b5cf6'; // amber or purple
+
+                document.getElementById('extraChartTitle').textContent = metricLabel;
+
+                // Filter out nulls for eval loss (since it logs less frequently)
+                const extraData = data.filter(d => metricKey in d && d[metricKey] !== null);
+
+                new Chart(document.getElementById('extraChart'), {
+                    type: 'line',
+                    data: {
+                        labels: extraData.map(d => d.step),
+                        datasets: [{
+                            label: metricLabel,
+                            data: extraData.map(d => d[metricKey]),
+                            borderColor: metricColor,
+                            backgroundColor: metricColor.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+                            fill: true,
+                            spanGaps: true
+                        }]
+                    },
+                    options: commonOptions
+                });
+            }
+        }
+    </script>
+</body>
+
+</html>
