@@ -79,9 +79,12 @@
             </div>
 
             <div class="flex items-center space-x-4">
-                <div class="glass-panel px-4 py-2 flex items-center space-x-2 border-emerald-500/30">
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span class="text-sm font-semibold text-emerald-400">Training Active</span>
+                <div id="phase-badge" class="glass-panel px-4 py-2 flex items-center space-x-2 border-emerald-500/30">
+                    <span id="phase-dot" class="w-2.5 h-2.5 rounded-full bg-gray-500"></span>
+                    <span id="phase-text" class="text-sm font-semibold text-gray-400">Connecting...</span>
+                </div>
+                <div id="eta-display" class="glass-panel px-4 py-2 text-sm text-gray-400 hidden">
+                    <span id="elapsed-label">⏱ --</span> &middot; <span id="eta-label">ETA --</span>
                 </div>
             </div>
         </div>
@@ -247,17 +250,112 @@
             }
         };
 
-        async function fetchMetrics() {
-            try {
-                const response = await fetch('/api/metrics');
-                if (!response.ok) throw new Error('Network response was not ok');
-                const payload = await response.json();
-                renderDashboard(payload);
-            } catch (error) {
-                console.error('Error fetching metrics:', error);
-                document.getElementById('last-updated').textContent = `Connection lost - Reconnecting...`;
-                document.getElementById('last-updated').classList.add('text-red-400');
+        // ── SSE Streaming Connection ─────────────────────────────
+        let evtSource = null;
+        let reconnectTimer = null;
+
+        function formatDuration(secs) {
+            if (secs == null || secs < 0) return '--';
+            secs = Math.round(secs);
+            const h = Math.floor(secs / 3600);
+            const m = Math.floor((secs % 3600) / 60);
+            const s = secs % 60;
+            if (h > 0) return `${h}h ${m}m ${s}s`;
+            if (m > 0) return `${m}m ${s}s`;
+            return `${s}s`;
+        }
+
+        function updatePhase(phase) {
+            const dot = document.getElementById('phase-dot');
+            const txt = document.getElementById('phase-text');
+            const badge = document.getElementById('phase-badge');
+            if (!dot || !txt || !badge) return;
+
+            // Reset classes
+            dot.className = 'w-2.5 h-2.5 rounded-full';
+            badge.className = 'glass-panel px-4 py-2 flex items-center space-x-2';
+
+            switch (phase) {
+                case 'training':
+                    dot.classList.add('bg-emerald-500', 'animate-pulse');
+                    txt.textContent = 'Training Active';
+                    txt.className = 'text-sm font-semibold text-emerald-400';
+                    badge.classList.add('border-emerald-500/30');
+                    break;
+                case 'completed':
+                    dot.classList.add('bg-blue-500');
+                    txt.textContent = 'Training Completed';
+                    txt.className = 'text-sm font-semibold text-blue-400';
+                    badge.classList.add('border-blue-500/30');
+                    break;
+                case 'error':
+                    dot.classList.add('bg-red-500');
+                    txt.textContent = 'Error';
+                    txt.className = 'text-sm font-semibold text-red-400';
+                    badge.classList.add('border-red-500/30');
+                    break;
+                default: // idle / connecting
+                    dot.classList.add('bg-gray-500');
+                    txt.textContent = 'Waiting...';
+                    txt.className = 'text-sm font-semibold text-gray-400';
+                    badge.classList.add('border-gray-500/30');
             }
+        }
+
+        function updateTimers(elapsed, eta) {
+            const container = document.getElementById('eta-display');
+            if (!container) return;
+            if (elapsed != null && elapsed > 0) {
+                container.classList.remove('hidden');
+                document.getElementById('elapsed-label').textContent = '⏱ ' + formatDuration(elapsed);
+                document.getElementById('eta-label').textContent = 'ETA ' + formatDuration(eta);
+            }
+        }
+
+        function connectStream() {
+            // Detect file:// protocol — SSE won't work, fall back to polling
+            if (window.location.protocol === 'file:') {
+                document.getElementById('last-updated').textContent = 'Open via http://localhost:8080/ for live updates';
+                document.getElementById('last-updated').classList.add('text-yellow-400');
+                return;
+            }
+
+            if (evtSource) { try { evtSource.close(); } catch (e) { } }
+
+            evtSource = new EventSource('/api/stream');
+
+            evtSource.addEventListener('progress', function (e) {
+                try {
+                    const payload = JSON.parse(e.data);
+                    renderDashboard(payload);
+                    // Update phase & timers
+                    updatePhase(payload.phase || 'idle');
+                    updateTimers(payload.elapsed_seconds, payload.eta_seconds);
+                } catch (err) {
+                    console.error('SSE parse error:', err);
+                }
+            });
+
+            evtSource.onopen = function () {
+                document.getElementById('last-updated').classList.remove('text-red-400');
+                if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+            };
+
+            evtSource.onerror = function () {
+                document.getElementById('last-updated').textContent = 'Connection lost — Reconnecting...';
+                document.getElementById('last-updated').classList.add('text-red-400');
+                updatePhase('idle');
+                evtSource.close();
+                // Auto-reconnect with backoff
+                if (!reconnectTimer) {
+                    reconnectTimer = setTimeout(function () {
+                        reconnectTimer = null;
+                        // Try to recover full state first
+                        fetch('/api/metrics').then(r => r.json()).then(p => renderDashboard(p)).catch(() => { });
+                        connectStream();
+                    }, 3000);
+                }
+            };
         }
 
         function renderDashboard(payload) {
@@ -529,9 +627,8 @@
             }
         } // Close renderDashboard
 
-        // Start Polling Loop
-        fetchMetrics();
-        setInterval(fetchMetrics, 3000);
+        // Start SSE connection (replaces polling)
+        connectStream();
 
     </script>
 </body>
