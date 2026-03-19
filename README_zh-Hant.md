@@ -132,10 +132,44 @@ customer_faq_sft_2026_03_17/
 | NVIDIA T4 (16 GB) | `unsloth` | 7B QLoRA，小規模 GRPO |
 | NVIDIA A100 (80 GB) | `unsloth` | 70B QLoRA，14B LoRA 16-bit |
 | Apple M1 / M2 / M3 / M4 | `mlx-tune` | 10 GB 統一記憶體跑 7B，24 GB 跑 13B |
+| Google Colab (T4/L4/A100) | `unsloth` 透過 `colab-mcp` | 免費雲端 GPU，可選接入 |
 
 Unsloth 相比標準 HuggingFace 訓練速度快約 2 倍，VRAM 使用量減少高達 80%，且使用精確梯度。
 
 **支援的訓練方法：** SFT、DPO、GRPO、ORPO、KTO、SimPO、視覺 SFT（Qwen2.5-VL、Llama 3.2 Vision、Gemma 3）
+
+---
+
+## 即時訓練儀表板
+
+每次本地訓練都會自動在 **http://localhost:8080/** 開啟即時儀表板：
+
+- **SSE 串流** — 透過 `EventSource` 即時推送更新，無輪詢延遲
+- **EMA 平滑損失** — 清晰的趨勢線覆蓋雜訊原始損失，附帶滾動均值
+- **動態階段徽章** — 閒置 → 訓練中 → 已完成 / 錯誤
+- **ETA 與已用時間** — 根據步驟進度估算剩餘時間
+- **梯度範數** — 有資料時自動顯示
+- **評估指標** — 帶動畫空狀態的評估損失/準確率
+- **峰值 VRAM** — 追蹤 GPU（CUDA）和 Apple MPS 記憶體用量
+
+同時支援 NVIDIA（透過 `GaslampDashboardCallback`）和 Apple Silicon（透過 `MlxGaslampDashboard` 標準輸出攔截器）。
+
+---
+
+## Google Colab 雲端訓練
+
+Apple Silicon 使用者如需更大的模型或 CUDA 專屬功能，可將訓練卸載到免費 Colab GPU：
+
+1. 在 Claude Code 中安裝 `colab-mcp`：
+   ```bash
+   uv python install 3.13
+   claude mcp add colab-mcp -- uvx --from git+https://github.com/googlecolab/colab-mcp --python 3.13 colab-mcp
+   ```
+2. 開啟 Colab 筆記本，連接到 T4/L4 GPU 執行階段
+3. Agent 自動連接、安裝 Unsloth，在背景執行緒中開始訓練，並每 30 秒輪詢指標
+4. 訓練完成後從 Colab 檔案瀏覽器下載適配器
+
+本地 mlx-tune 仍是預設選項 — Colab 為需要更多算力時的選擇。
 
 ---
 
