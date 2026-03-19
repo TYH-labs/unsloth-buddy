@@ -66,6 +66,7 @@ def get_training_cell(
     hf_dataset_id:  str,
     dataset_split:  str  = "train",
     dataset_field:  str  = "text",       # "text" for pre-formatted, "messages" for chat
+    data_files:     str  = None,         # e.g. "unified_chip2.jsonl" for laion/OIG
     lora_rank:      int  = 16,
     lora_alpha:     int  = 16,
     max_seq_length: int  = 2048,
@@ -84,6 +85,7 @@ def get_training_cell(
       - Starts trainer.train() in a daemon background thread
       - Prints TRAINING_STARTED: <json meta> when the thread is launched
     """
+    data_files_arg = f", data_files={data_files!r}" if data_files else ""
     return f"""
 import json, threading, torch
 from unsloth import FastLanguageModel
@@ -125,7 +127,7 @@ model = FastLanguageModel.get_peft_model(
 )
 
 # ── Dataset ───────────────────────────────────────────────────────────────────
-dataset = load_dataset({hf_dataset_id!r}, split={dataset_split!r})
+dataset = load_dataset({hf_dataset_id!r}{data_files_arg}, split={dataset_split!r})
 
 # ── Trainer ───────────────────────────────────────────────────────────────────
 trainer = SFTTrainer(
