@@ -137,16 +137,24 @@
                 </div>
 
                 <!-- Gradient Norm -->
-                <div class="glass-panel p-6 hidden" id="gradNormContainer">
+                <div class="glass-panel p-6 relative" id="gradNormContainer">
                     <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Gradient Norm</h3>
                     <div class="relative h-64"><canvas id="gradNormChart"></canvas></div>
+                    <div id="gradNormEmptyState" class="absolute inset-0 z-10 flex flex-col items-center justify-center backdrop-blur-sm bg-gray-900/40 rounded-xl transition-opacity duration-500">
+                        <svg class="w-8 h-8 text-gray-500 mb-2 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        <p class="text-sm text-gray-400 text-center font-medium">Waiting for first<br>gradient norm log...</p>
+                    </div>
                 </div>
 
                 <!-- Eval / Validation Metrics (Dynamic full width) -->
-                <div class="glass-panel p-6 md:col-span-2 hidden" id="evalChartContainer">
+                <div class="glass-panel p-6 md:col-span-2 relative" id="evalChartContainer">
                     <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Evaluation Metrics
                     </h3>
                     <div class="relative h-72"><canvas id="evalChart"></canvas></div>
+                    <div id="evalEmptyState" class="absolute inset-0 z-10 flex flex-col items-center justify-center backdrop-blur-sm bg-gray-900/40 rounded-xl transition-opacity duration-500">
+                        <svg class="w-8 h-8 text-gray-500 mb-2 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                        <p class="text-sm text-gray-400 font-medium">Waiting for evaluations to begin...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -226,6 +234,20 @@
 
     <!-- Dynamic Data Polling -->
     <script>
+        // Exponential Moving Average (EMA) for noisy data like training loss
+        function calculateEMA(data, alpha) {
+            if (!data || data.length === 0) return [];
+            let last = data[0].y;
+            let count = 0;
+            return data.map(point => {
+                let current = point.y;
+                last = last * alpha + (1 - alpha) * current;
+                count++;
+                let debias = alpha === 1 ? 1 : (1 - Math.pow(alpha, count));
+                return { x: point.x, y: last / debias };
+            });
+        }
+
         let lossChartInstance = null;
         let lrChartInstance = null;
         let evalChartInstance = null;
@@ -445,34 +467,72 @@
                 // Training Loss Chart
                 const lossData = logs.filter(l => 'loss' in l).map(l => ({ x: l.step, y: l.loss }));
                 if (lossData.length > 0) {
+                    const smoothedLossData = calculateEMA(lossData, 0.95);
+                    const avgLossValue = lossData.reduce((acc, curr) => acc + curr.y, 0) / lossData.length;
+                    const avgLossData = lossData.map(d => ({ x: d.x, y: avgLossValue }));
+
                     // Update instances instead of recreating them if they exist
                     if (lossChartInstance) {
                         lossChartInstance.data.labels = lossData.map(d => d.x);
-                        lossChartInstance.data.datasets[0].data = lossData;
+                        lossChartInstance.data.datasets[0].data = smoothedLossData;
+                        lossChartInstance.data.datasets[1].data = lossData;
+                        lossChartInstance.data.datasets[2].data = avgLossData;
                         lossChartInstance.update('none'); // Update without animation for smoother polling
                     } else {
                         const lossOptions = JSON.parse(JSON.stringify(lineOptions));
                         lossOptions.scales.y.type = currentLossScale;
+                        lossOptions.plugins.tooltip = {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) { label += ': '; }
+                                    if (context.parsed.y !== null) { label += context.parsed.y.toFixed(4); }
+                                    return label;
+                                }
+                            }
+                        };
                         lossChartInstance = new Chart(document.getElementById('lossChart'), {
                             type: 'line',
                             data: {
                                 labels: lossData.map(d => d.x),
-                                datasets: [{
-                                    label: 'Training Loss',
-                                    data: lossData,
-                                    borderColor: '#10b981',
-                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                    fill: true,
-                                    tension: 0.1,
-                                    borderWidth: 3,
-                                    pointRadius: 0,
-                                    pointHoverRadius: 6
-                                }]
+                                datasets: [
+                                    {
+                                        label: 'Smoothed',
+                                        data: smoothedLossData,
+                                        borderColor: '#10b981',
+                                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                        fill: false,
+                                        tension: 0.1,
+                                        borderWidth: 2.2,
+                                        pointRadius: 0,
+                                        pointHoverRadius: 6
+                                    },
+                                    {
+                                        label: 'Loss',
+                                        data: lossData,
+                                        borderColor: 'rgba(16, 185, 129, 0.35)',
+                                        fill: true,
+                                        tension: 0.1,
+                                        borderWidth: 1.2,
+                                        pointRadius: 0,
+                                        pointHoverRadius: 0
+                                    },
+                                    {
+                                        label: 'Avg',
+                                        data: avgLossData,
+                                        borderColor: '#3b82f6',
+                                        borderDash: [5, 5],
+                                        fill: false,
+                                        borderWidth: 1.5,
+                                        pointRadius: 0,
+                                        pointHoverRadius: 0
+                                    }
+                                ]
                             },
                             options: lossOptions
                         });
                     }
-                } // Remove errant closing brace in next block
+                } 
 
                 // Learn Rate Chart
                 const lrData = logs.filter(l => 'learning_rate' in l).map(l => ({ x: l.step, y: l.learning_rate }));
@@ -507,7 +567,11 @@
                 // Gradient Norm Chart
                 const gradData = logs.filter(l => 'grad_norm' in l).map(l => ({ x: l.step, y: l.grad_norm }));
                 if (gradData.length > 0) {
-                    document.getElementById('gradNormContainer').classList.remove('hidden');
+                    const emptyState = document.getElementById('gradNormEmptyState');
+                    if (emptyState) {
+                        emptyState.style.opacity = '0';
+                        setTimeout(() => emptyState.classList.add('hidden'), 500);
+                    }
                     if (gradNormChartInstance) {
                         gradNormChartInstance.data.labels = gradData.map(d => d.x);
                         gradNormChartInstance.data.datasets[0].data = gradData;
@@ -534,7 +598,11 @@
                 }
                 // Dynamic Eval Charting (finds anything starting with eval_)
                 if (evalLogs.length > 0) {
-                    document.getElementById('evalChartContainer').classList.remove('hidden');
+                    const emptyState = document.getElementById('evalEmptyState');
+                    if (emptyState) {
+                        emptyState.style.opacity = '0';
+                        setTimeout(() => emptyState.classList.add('hidden'), 500);
+                    }
 
                     // Collect all dynamic eval keys (eval_loss, eval_accuracy, eval_f1, etc)
                     const evalKeys = new Set();

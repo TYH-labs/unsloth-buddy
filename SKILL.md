@@ -72,6 +72,12 @@ python ../scripts/detect_env.py
 ```
 Only proceed when Stage 2 prints **"READY FOR TRAINING"**.
 
+**Apple Silicon users**: You have two training paths available:
+- **Local mlx-tune** (default) — best for models ≤8B, fast iteration, no internet needed. Use Path C.
+- **Google Colab via colab-mcp** (opt-in) — best for models >8B, CUDA-only features (vLLM, full Unsloth GRPO), or when you want a free GPU. Use Path E. Requires `colab-mcp` configured in MCP settings.
+
+Ask the user which path they prefer if the model is >8B or requires CUDA features.
+
 ### Phase 4: Code Generation & Execution
 
 Generate `train.py` inside the project directory with all paths relative to it:
@@ -88,6 +94,14 @@ Generate `train.py` inside the project directory with all paths relative to it:
   ```
   - Tell the user they can double-click `outputs/training_dashboard.html` in their file explorer (or open via gaslamp) to view real-time metrics during training.
 - Update `progress_log.md` and `memory.md` with final loss and hyperparameters used.
+
+**If using the Colab path (Path E)**, the workflow differs:
+1. Run `scripts/setup_colab.py` via colab-mcp's `execute_code` to install Unsloth and verify the GPU.
+2. Upload dataset: use `colab_training.generate_upload_code()` for small files (<10MB) or `colab_training.generate_hf_download_code()` for HuggingFace datasets.
+3. Generate `train.py` as usual, but execute it via `execute_code` instead of the local terminal.
+4. Monitor: poll metrics via `colab_training.generate_metrics_poll_code()` to relay to the local dashboard.
+5. Download outputs: use `colab_training.generate_download_code()` to retrieve adapters/GGUF back to the local `outputs/` directory.
+6. Update `progress_log.md` and `memory.md` as usual.
 
 ### Phase 5: Evaluation & Metrics
 
@@ -235,6 +249,48 @@ Guide the user to:
 docker run -d -p 8888:8888 -v $(pwd):/workspace/work --gpus all unsloth/unsloth
 ```
 Tell them to access Jupyter Lab at `http://localhost:8888`.
+
+**E. Google Colab via colab-mcp (Remote GPU for Mac Users)**:
+
+This path gives Apple Silicon users (or anyone without a local NVIDIA GPU) access to free Colab GPUs (T4/L4/A100) while keeping the local project structure intact. **Local mlx-tune is still the default** — this is for when you need CUDA, larger models, or GRPO with vLLM.
+
+**Prerequisites:**
+1. Install `uv`: `pip install uv`
+2. Configure colab-mcp in your MCP settings (`.gemini/settings.json` or equivalent):
+```json
+{
+  "mcpServers": {
+    "colab-mcp": {
+      "command": "uvx",
+      "args": ["git+https://github.com/googlecolab/colab-mcp"],
+      "timeout": 30000
+    }
+  }
+}
+```
+3. Google account with Colab access
+
+**Setup steps:**
+1. Use colab-mcp's `execute_code` tool to run `scripts/setup_colab.py` on the Colab VM:
+```python
+# The agent reads setup_colab.py and sends it via execute_code
+from scripts.colab_training import generate_setup_code
+code = generate_setup_code()
+# → execute via colab-mcp execute_code tool
+```
+2. Verify the JSON output shows `"status": "ready"` and a GPU is detected.
+3. Upload your dataset and training script (see Phase 4 Colab workflow).
+4. Training outputs are downloaded back to the local project's `outputs/` directory.
+
+**When to suggest this path:**
+- User is on Apple Silicon and needs a model >8B parameters
+- User needs CUDA-exclusive features (vLLM fast inference, FP8 quantization)
+- User wants GRPO with vLLM generation (requires CUDA)
+- User's local machine doesn't have enough RAM for the desired model
+
+**Helper scripts:**
+- `scripts/setup_colab.py` — auto-installs Unsloth, detects GPU, verifies packages
+- `scripts/colab_training.py` — code generators for upload, train, download, and metrics polling
 
 ---
 
@@ -736,6 +792,8 @@ See the `scripts/` directory for ready-to-use templates:
 - **`scripts/unsloth_grpo_example.py`**: GRPO reinforcement learning script.
 - **`scripts/unsloth_vision_example.py`**: Vision/multimodal fine-tuning script.
 - **`scripts/mlx_eval_template.py`**: Evaluation template for Apple Silicon / mlx-tune (batch, interactive, compare modes).
+- **`scripts/setup_colab.py`**: Auto-setup Unsloth on a Google Colab VM (GPU detection, install, verification).
+- **`scripts/colab_training.py`**: Helper module for remote Colab training (upload, execute, download, metrics polling).
 
 ## Resources
 
