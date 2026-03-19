@@ -1,6 +1,12 @@
 # Unsloth Buddy
 
-![Unsloth Buddy Thumbnail](https://raw.githubusercontent.com/unslothai/unsloth/main/images/unsloth%20logo%20white%20text.png)
+<p align="center">
+  <img src="images/unsloth_gaslamp.png" width="600" alt="Unsloth Buddy"/>
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> | <a href="README_zh-Hans.md">简体中文</a> | <a href="README_zh-Hant.md">繁體中文</a>
+</p>
 
 **Unsloth Buddy** is an intelligent, end-to-end AI development agent skill that fine-tunes Large Language Models (LLMs) and Vision Language Models (VLMs) using [Unsloth](https://github.com/unslothai/unsloth) and [mlx-tune](https://github.com/ARahim3/mlx-tune) (Apple Silicon). It features a real-time SSE-powered training dashboard and supports remote GPU training via [colab-mcp](https://github.com/googlecolab/colab-mcp).
 

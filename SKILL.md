@@ -118,13 +118,13 @@ Open `~/.claude.json`, find the `colab-mcp` entry under your project's `mcpServe
 
 **Step A3 — Setup: install Unsloth and verify GPU**
 
-Call `execute_code` with the code from `scripts/colab_training.py::SETUP_CELL`.
+Add a code cell with `scripts/colab_training.py::SETUP_CELL` content via `add_code_cell`, then run it with `run_code_cell`.
 
 Parse the output — it prints a JSON line then `SETUP_OK`. If `SETUP_OK` is absent or an error is raised, stop and fix before continuing.
 
 **Step A4 — Verify: smoke-test all packages**
 
-Call `execute_code` with `scripts/colab_training.py::VERIFY_CELL`.
+Add a code cell with `scripts/colab_training.py::VERIFY_CELL` content and run it.
 
 The output is a JSON dict with versions and VRAM. Check:
 - `vram_gb >= 6` (T4 = 15 GB, L4 = 22 GB — should pass)
@@ -137,7 +137,7 @@ Show the user the GPU name and VRAM, then proceed.
 
 Call `scripts/colab_training.py::get_training_cell(...)` with the parameters from the Phase 1 interview. Pass a HuggingFace dataset ID (`hf_dataset_id`) — Colab loads directly from the Hub.
 
-Pass the result to `execute_code`. The cell:
+Add the returned code as a cell via `add_code_cell` and run it. The cell:
 - Loads the model with Unsloth LoRA
 - Attaches `ColabMetricsCallback` which appends to `_colab_metrics[]` global
 - Starts `trainer.train()` in a background daemon thread
@@ -147,7 +147,7 @@ Parse the `TRAINING_STARTED:` line to confirm training began.
 
 **Step A6 — Monitor training loop**
 
-Every 30 seconds, call `execute_code` with `scripts/colab_training.py::POLL_CELL`.
+Every 30 seconds, update the poll cell with `scripts/colab_training.py::POLL_CELL` content (or add once and re-run it) via `run_code_cell`.
 
 The output is a line beginning `POLL: <json>` with:
 ```json
@@ -158,7 +158,7 @@ Report progress to the user each poll. Stop looping when `done: true`. If `error
 
 **Step A7 — Fetch final results**
 
-Call `execute_code` with `scripts/colab_training.py::FINAL_CELL`.
+Add a code cell with `scripts/colab_training.py::FINAL_CELL` content and run it.
 
 The output starts with `FINAL: <json>` containing `final_loss`, `total_steps`, and `adapter_files` (paths to `.safetensors` in `/content/outputs/`).
 
@@ -197,24 +197,32 @@ Ask the user which path they prefer if the model is >8B or requires CUDA feature
 - Data cached to `"data/"`
 - Use `FastLanguageModel` or `FastVisionModel` (or `mlx_tune` equivalents on Apple Silicon).
 - **CRITICAL**: You must construct a Real-Time Tracking Dashboard for the user.
-  - Copy `../templates/dashboard.html` into the project directory.
-  - Copy `../scripts/gaslamp_callback.py` into the project directory.
-  - In `train.py`, import `GaslampDashboardCallback` from `gaslamp_callback` and pass it to the TRL Trainer: `trainer = ...Trainer(..., callbacks=[GaslampDashboardCallback()])`
+  - **NVIDIA/TRL**: Copy `gaslamp_callback.py` and `templates/` into the project directory:
+    ```bash
+    cp ../scripts/gaslamp_callback.py .
+    mkdir -p templates && cp ../templates/dashboard.html templates/
+    ```
+    In `train.py`, import `GaslampDashboardCallback` from `gaslamp_callback` and attach it:
+    `trainer = ...Trainer(..., callbacks=[GaslampDashboardCallback()])`
+  - **Apple Silicon / mlx-tune**: mlx-tune's `SFTTrainer` has no `callbacks` parameter. Use `MlxGaslampDashboard` instead — a context manager that intercepts stdout:
+    ```bash
+    cp ../scripts/mlx_gaslamp_dashboard.py .
+    mkdir -p templates && cp ../templates/dashboard.html templates/
+    ```
+    ```python
+    from mlx_gaslamp_dashboard import MlxGaslampDashboard
+
+    with MlxGaslampDashboard(iters=ITERS, hyperparams={"learning_rate": LR, ...}):
+        trainer.train()
+    ```
+    Dashboard serves at **http://localhost:8080/** with loss, learning rate, val loss, Peak mem (GB), tokens/sec.
 - Ask the user: *"Should I execute the training script now?"*
 - If approved, use your terminal tool to run it and tee stdout to `logs/train.log`:
   ```bash
   python train.py 2>&1 | tee logs/train.log
   ```
-  - Tell the user they can double-click `outputs/training_dashboard.html` in their file explorer (or open via gaslamp) to view real-time metrics during training.
+  - Tell the user to open **http://localhost:8080/** in their browser to view live training metrics.
 - Update `progress_log.md` and `memory.md` with final loss and hyperparameters used.
-
-**If using the Colab path (Path E)**, the workflow differs:
-1. Run `scripts/setup_colab.py` via colab-mcp's `execute_code` to install Unsloth and verify the GPU.
-2. Upload dataset: use `colab_training.generate_upload_code()` for small files (<10MB) or `colab_training.generate_hf_download_code()` for HuggingFace datasets.
-3. Generate `train.py` as usual, but execute it via `execute_code` instead of the local terminal.
-4. Monitor: poll metrics via `colab_training.generate_metrics_poll_code()` to relay to the local dashboard.
-5. Download outputs: use `colab_training.generate_download_code()` to retrieve adapters/GGUF back to the local `outputs/` directory.
-6. Update `progress_log.md` and `memory.md` as usual.
 
 ### Phase 5: Evaluation & Metrics
 
