@@ -61,6 +61,115 @@ After the interview, but before writing training code, read `sub-skills/data.md`
 
 ### Phase 3: Environment Analysis & Setup
 
+**First — ask the user which environment they want to use:**
+
+> *"Where would you like to train? Options:*
+> *A) Google Colab (free T4/L4 GPU, no local setup)*
+> *B) Local NVIDIA GPU*
+> *C) Apple Silicon Mac (MLX)*"
+
+Follow the matching path below.
+
+---
+
+#### Path A: Google Colab (via colab-mcp)
+
+Colab gives free GPU access with no local installation. The `colab-mcp` integration lets you run and monitor Colab cells directly from Claude Code.
+
+**Step A1 — Install colab-mcp (first time only)**
+
+**First, check whether `execute_code` is available as an MCP tool in the current session.**
+- If `execute_code` IS available → skip to Step A2.
+- If `execute_code` is NOT available → colab-mcp is not installed. Run the install flow below.
+
+**Install for Claude Code (CLI):**
+
+```bash
+# 1. (If needed) Install Python 3.13
+uv python install 3.13
+
+# 2. Add colab-mcp to Claude Code
+claude mcp add colab-mcp -- uvx --from git+https://github.com/googlecolab/colab-mcp --python 3.13 colab-mcp
+
+# 3. Verify it was added
+claude mcp list
+```
+
+Open `~/.claude.json`, find the `colab-mcp` entry under your project's `mcpServers`, and ensure it matches:
+```json
+"colab-mcp": {
+  "command": "uvx",
+  "args": ["--from", "git+https://github.com/googlecolab/colab-mcp",
+           "--python", "3.13", "colab-mcp"],
+  "timeout": 30000
+}
+```
+
+> Note: colab-mcp requires Python ≥ 3.13. `uvx --python 3.13` runs it in an isolated env, keeping your training venv (Python ≤ 3.12 for mlx-tune) untouched. Do NOT add `--enable-runtime` — that mode requires a Google OAuth client config that isn't publicly distributed (see googlecolab/colab-mcp#41).
+
+**3. Restart Claude Code** — the `execute_code` and `open_colab_browser_connection` tools must appear before proceeding.
+
+> Note: colab-mcp connects to a live Colab runtime. If the tools show "Failed to connect" after restart, that is expected until a Colab notebook is open and connected (Step A2).
+
+**Step A2 — Connect to a Colab runtime**
+
+1. Tell the user to open a new notebook at https://colab.research.google.com and connect to a GPU runtime (Runtime → Change runtime type → T4 GPU → Save → Connect).
+2. Call the MCP tool `open_colab_browser_connection`. A browser window opens; the user clicks the auth link. The tool returns `true` when connected.
+
+**Step A3 — Setup: install Unsloth and verify GPU**
+
+Call `execute_code` with the code from `scripts/colab_training.py::SETUP_CELL`.
+
+Parse the output — it prints a JSON line then `SETUP_OK`. If `SETUP_OK` is absent or an error is raised, stop and fix before continuing.
+
+**Step A4 — Verify: smoke-test all packages**
+
+Call `execute_code` with `scripts/colab_training.py::VERIFY_CELL`.
+
+The output is a JSON dict with versions and VRAM. Check:
+- `vram_gb >= 6` (T4 = 15 GB, L4 = 22 GB — should pass)
+- All package versions are present
+- Output ends with `VERIFY_OK`
+
+Show the user the GPU name and VRAM, then proceed.
+
+**Step A5 — Generate and start training**
+
+Call `scripts/colab_training.py::get_training_cell(...)` with the parameters from the Phase 1 interview. Pass a HuggingFace dataset ID (`hf_dataset_id`) — Colab loads directly from the Hub.
+
+Pass the result to `execute_code`. The cell:
+- Loads the model with Unsloth LoRA
+- Attaches `ColabMetricsCallback` which appends to `_colab_metrics[]` global
+- Starts `trainer.train()` in a background daemon thread
+- Prints `TRAINING_STARTED: <json>` immediately and returns
+
+Parse the `TRAINING_STARTED:` line to confirm training began.
+
+**Step A6 — Monitor training loop**
+
+Every 30 seconds, call `execute_code` with `scripts/colab_training.py::POLL_CELL`.
+
+The output is a line beginning `POLL: <json>` with:
+```json
+{"done": false, "n_logs": 12, "latest_step": 60, "latest_loss": 1.42, "recent": [...], "error": null}
+```
+
+Report progress to the user each poll. Stop looping when `done: true`. If `error` is non-null, report it and stop.
+
+**Step A7 — Fetch final results**
+
+Call `execute_code` with `scripts/colab_training.py::FINAL_CELL`.
+
+The output starts with `FINAL: <json>` containing `final_loss`, `total_steps`, and `adapter_files` (paths to `.safetensors` in `/content/outputs/`).
+
+Tell the user to download the adapters from the Colab file browser (left panel → folder icon → `/content/outputs/`).
+
+Update `progress_log.md` and `memory.md` with final loss, GPU used, and adapter location.
+
+---
+
+#### Path B / C: Local GPU or Apple Silicon
+
 Run Stage 1 detection from the project directory (uses any system Python — no venv needed):
 ```bash
 python3 ../scripts/detect_system.py
@@ -80,8 +189,12 @@ Ask the user which path they prefer if the model is >8B or requires CUDA feature
 
 ### Phase 4: Code Generation & Execution
 
-Generate `train.py` inside the project directory with all paths relative to it:
-- `output_dir = "outputs"`, `adapter_path = "outputs/adapters"`, data cached to `"data/"`
+**If using Colab (Path A):** Phases A5–A7 above already cover training and monitoring. Skip to Phase 5 once `FINAL_CELL` returns successfully.
+
+**If using local (Path B/C):** Generate `train.py` inside the project directory with all paths relative to it:
+- **NVIDIA/TRL**: `output_dir = "outputs"`, adapter weights saved by the trainer to `outputs/`
+- **Apple Silicon/mlx-tune**: `output_dir = "outputs"`, `adapter_path = "adapters"` (mlx-tune prepends `output_dir`, so `"adapters"` → `outputs/adapters/`; do NOT set `adapter_path = "outputs/adapters"` or it double-nests)
+- Data cached to `"data/"`
 - Use `FastLanguageModel` or `FastVisionModel` (or `mlx_tune` equivalents on Apple Silicon).
 - **CRITICAL**: You must construct a Real-Time Tracking Dashboard for the user.
   - Copy `../templates/dashboard.html` into the project directory.

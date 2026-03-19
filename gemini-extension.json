@@ -1,0 +1,23 @@
+{
+  "name": "unsloth-buddy",
+  "version": "1.0.0",
+  "description": "Zero-friction LLM fine-tuning on NVIDIA (Unsloth) and Apple Silicon (mlx-tune). SFT, DPO, GRPO, vision — env setup to export, fully automated.",
+  "contextFiles": [
+    "SKILL.md",
+    "AGENTS.md",
+    "sub-skills/interview.md",
+    "sub-skills/data.md",
+    "scripts/init_project.py",
+    "scripts/detect_system.py",
+    "scripts/detect_env.py",
+    "scripts/mlx_eval_template.py",
+    "scripts/gaslamp_callback.py",
+    "scripts/unsloth_sft_example.py",
+    "scripts/unsloth_dpo_example.py",
+    "scripts/unsloth_grpo_example.py",
+    "scripts/unsloth_vision_example.py",
+    "scripts/unsloth_mlx_sft_example.py",
+    "templates/dashboard.html"
+  ],
+  "schemaVersion": "1.0"
+}

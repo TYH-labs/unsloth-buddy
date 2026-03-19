@@ -1,0 +1,40 @@
+{
+  "name": "unsloth-buddy",
+  "owner": { "name": "Gaslamp", "url": "https://gaslamp.dev" },
+  "metadata": {
+    "description": "Agentic LLM fine-tuning skill for Claude Code — Unsloth on NVIDIA, mlx-tune on Apple Silicon.",
+    "version": "1.0.0",
+    "repository": "https://github.com/TYH-labs/unsloth-buddy",
+    "documentation": "https://gaslamp.dev/unsloth"
+  },
+  "plugins": [
+    {
+      "name": "unsloth-buddy",
+      "source": "./",
+      "skills": "./SKILL.md",
+      "sub-skills": [
+        "./sub-skills/interview.md",
+        "./sub-skills/data.md"
+      ],
+      "scripts": [
+        "./scripts/init_project.py",
+        "./scripts/detect_system.py",
+        "./scripts/detect_env.py",
+        "./scripts/mlx_eval_template.py",
+        "./scripts/gaslamp_callback.py",
+        "./scripts/unsloth_sft_example.py",
+        "./scripts/unsloth_dpo_example.py",
+        "./scripts/unsloth_grpo_example.py",
+        "./scripts/unsloth_vision_example.py",
+        "./scripts/unsloth_mlx_sft_example.py"
+      ],
+      "templates": [
+        "./templates/dashboard.html"
+      ],
+      "agents": [
+        "./AGENTS.md"
+      ],
+      "description": "Fine-tune LLMs end-to-end: env setup, LoRA training (SFT/DPO/GRPO/vision), evaluation, and export. Works on NVIDIA GPUs and Apple Silicon."
+    }
+  ]
+}
