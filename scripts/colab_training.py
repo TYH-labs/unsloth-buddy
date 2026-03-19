@@ -1,223 +1,236 @@
 """
-colab_training.py — Helper utilities for remote Unsloth training on Google Colab.
+colab_training.py — Code templates for training on Google Colab via colab-mcp.
 
-These functions are used by the AI agent (not the user directly) to manage
-the Colab training workflow via colab-mcp's execute_code MCP tool.
+Each constant / function returns a Python code string to pass to the
+`execute_code` MCP tool.  The training cell runs the trainer in a background
+thread so execute_code returns immediately; use POLL_CELL to track progress.
 
-Workflow:
-    1. setup()     — install Unsloth and verify GPU
-    2. upload()    — send dataset/script to Colab kernel
-    3. train()     — execute training and stream logs
-    4. download()  — retrieve adapters/GGUF back to local
+Typical call sequence:
+    1. execute_code(SETUP_CELL)          # install unsloth, check GPU
+    2. execute_code(VERIFY_CELL)         # smoke-test imports + VRAM
+    3. execute_code(get_training_cell(...))   # start training in background
+    4. loop: execute_code(POLL_CELL)     # monitor until done: true
+    5. execute_code(FINAL_CELL)          # fetch final metrics + adapter path
 """
 
-import base64
+# ── Step 1: Install & GPU check ───────────────────────────────────────────────
+SETUP_CELL = """
+import subprocess, sys, json
+
+print("Installing Unsloth...")
+subprocess.run(
+    [sys.executable, "-m", "pip", "install", "unsloth", "-q"],
+    check=True, capture_output=True
+)
+
+import torch
+assert torch.cuda.is_available(), (
+    "FAIL: No GPU — go to Runtime → Change runtime type → GPU"
+)
+
+gpu_name = torch.cuda.get_device_name(0)
+vram_gb  = torch.cuda.get_device_properties(0).total_memory / 1e9
+
+print(json.dumps({
+    "gpu":     gpu_name,
+    "vram_gb": round(vram_gb, 1),
+    "cuda":    torch.version.cuda,
+}))
+print("SETUP_OK")
+"""
+
+# ── Step 2: Verify imports & VRAM ─────────────────────────────────────────────
+VERIFY_CELL = """
+import json, torch
+from unsloth import FastLanguageModel
+import unsloth, trl, transformers, datasets as ds_lib
+
+vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+assert vram_gb >= 6, f"FAIL: Only {vram_gb:.1f} GB VRAM — need at least 6 GB"
+
+result = {
+    "unsloth":       unsloth.__version__,
+    "trl":           trl.__version__,
+    "transformers":  transformers.__version__,
+    "datasets":      ds_lib.__version__,
+    "gpu":           torch.cuda.get_device_name(0),
+    "vram_gb":       round(vram_gb, 1),
+}
+print(json.dumps(result))
+print("VERIFY_OK")
+"""
+
+# ── Step 3: Training cell (run in background thread) ─────────────────────────
+def get_training_cell(
+    model_name:     str,
+    hf_dataset_id:  str,
+    dataset_split:  str  = "train",
+    dataset_field:  str  = "text",       # "text" for pre-formatted, "messages" for chat
+    lora_rank:      int  = 16,
+    lora_alpha:     int  = 16,
+    max_seq_length: int  = 2048,
+    max_steps:      int  = 200,
+    batch_size:     int  = 2,
+    grad_accum:     int  = 4,
+    learning_rate:  float = 2e-4,
+    output_dir:     str  = "/content/outputs",
+) -> str:
+    """
+    Returns a Python code string that:
+      - Loads the model + LoRA
+      - Loads the dataset from HuggingFace Hub
+      - Defines _colab_metrics (list) and _colab_training_done (bool) globals
+      - Attaches ColabMetricsCallback to the TRL SFTTrainer
+      - Starts trainer.train() in a daemon background thread
+      - Prints TRAINING_STARTED: <json meta> when the thread is launched
+    """
+    return f"""
+import json, threading, torch
+from unsloth import FastLanguageModel
+from trl import SFTTrainer, SFTConfig
+from datasets import load_dataset
+from transformers import TrainerCallback, TrainingArguments, TrainerState, TrainerControl
+
+# ── Shared state (read by POLL_CELL) ─────────────────────────────────────────
+_colab_metrics       = []
+_colab_training_done = False
+_colab_error         = None
+
+# ── Metrics callback ──────────────────────────────────────────────────────────
+class ColabMetricsCallback(TrainerCallback):
+    def on_log(self, args: TrainingArguments, state: TrainerState,
+               control: TrainerControl, logs=None, **kwargs):
+        global _colab_metrics
+        if logs and state.is_world_process_zero:
+            entry = {{**{{k: v for k, v in logs.items() if isinstance(v, (int, float))}},
+                      "step": state.global_step}}
+            _colab_metrics.append(entry)
+
+# ── Load model ────────────────────────────────────────────────────────────────
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name     = {model_name!r},
+    max_seq_length = {max_seq_length},
+    load_in_4bit   = True,
+)
+model = FastLanguageModel.get_peft_model(
+    model,
+    r                          = {lora_rank},
+    lora_alpha                 = {lora_alpha},
+    target_modules             = ["q_proj","k_proj","v_proj","o_proj",
+                                  "gate_proj","up_proj","down_proj"],
+    lora_dropout               = 0,
+    bias                       = "none",
+    use_gradient_checkpointing = "unsloth",
+    random_state               = 3407,
+)
+
+# ── Dataset ───────────────────────────────────────────────────────────────────
+dataset = load_dataset({hf_dataset_id!r}, split={dataset_split!r})
+
+# ── Trainer ───────────────────────────────────────────────────────────────────
+trainer = SFTTrainer(
+    model            = model,
+    processing_class = tokenizer,
+    train_dataset    = dataset,
+    {"dataset_text_field = " + repr(dataset_field) + "," if dataset_field != "messages" else "# messages format — chat template applied automatically"}
+    args = SFTConfig(
+        per_device_train_batch_size = {batch_size},
+        gradient_accumulation_steps = {grad_accum},
+        max_steps                   = {max_steps},
+        learning_rate               = {learning_rate},
+        fp16                        = not torch.cuda.is_bf16_supported(),
+        bf16                        = torch.cuda.is_bf16_supported(),
+        logging_steps               = 1,
+        optim                       = "adamw_8bit",
+        output_dir                  = {output_dir!r},
+        report_to                   = "none",
+    ),
+    callbacks = [ColabMetricsCallback()],
+)
+
+# ── Start training in background ──────────────────────────────────────────────
+def _run():
+    global _colab_training_done, _colab_error
+    try:
+        trainer.train()
+    except Exception as e:
+        _colab_error = str(e)
+    finally:
+        _colab_training_done = True
+
+_thread = threading.Thread(target=_run, daemon=True)
+_thread.start()
+
+print("TRAINING_STARTED: " + json.dumps({{
+    "model":       {model_name!r},
+    "dataset":     {hf_dataset_id!r},
+    "max_steps":   {max_steps},
+    "output_dir":  {output_dir!r},
+}}))
+"""
+
+# ── Step 4: Poll training progress ───────────────────────────────────────────
+POLL_CELL = """
 import json
-import os
-import textwrap
+snapshot = {
+    "done":    _colab_training_done,
+    "error":   _colab_error,
+    "n_logs":  len(_colab_metrics),
+    "recent":  _colab_metrics[-5:] if _colab_metrics else [],
+}
+if _colab_metrics:
+    latest = _colab_metrics[-1]
+    snapshot["latest_loss"] = latest.get("loss")
+    snapshot["latest_step"] = latest.get("step")
+print("POLL: " + json.dumps(snapshot))
+"""
 
+# ── Step 5: Final metrics + adapter location ──────────────────────────────────
+FINAL_CELL = """
+import json, os, glob
 
-# ---------------------------------------------------------------------------
-# Code generators — these produce Python code strings to run via execute_code
-# ---------------------------------------------------------------------------
+adapter_files = glob.glob("/content/outputs/**/*.safetensors", recursive=True)
+summary = {
+    "total_steps":    len(_colab_metrics),
+    "final_loss":     _colab_metrics[-1].get("loss") if _colab_metrics else None,
+    "all_metrics":    _colab_metrics,
+    "adapter_files":  adapter_files,
+    "error":          _colab_error,
+}
+print("FINAL: " + json.dumps(summary))
+"""
 
-def generate_setup_code():
-    """Return Python code to install Unsloth and verify the environment on Colab."""
-    # Read the setup_colab.py script and wrap it as inline code
-    setup_script = os.path.join(os.path.dirname(__file__), "setup_colab.py")
-    if os.path.exists(setup_script):
-        with open(setup_script, "r") as f:
-            return f.read() + "\nmain()"
-    # Fallback: inline install
-    return textwrap.dedent("""\
-        import subprocess, sys, json
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "unsloth"])
-        import torch
-        print(json.dumps({
-            "status": "ready",
-            "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none",
-            "vram_gb": round(torch.cuda.get_device_properties(0).total_mem / (1024**3), 1) if torch.cuda.is_available() else 0
-        }))
-    """)
+# ── Colab MCP installation instructions (printed to user) ────────────────────
+INSTALL_INSTRUCTIONS = """
+To use Google Colab for training, install colab-mcp in Claude Code:
 
+1. Install Python 3.13 (colab-mcp requires it; keeps your training venv intact):
+     uv python install 3.13
 
-def generate_upload_code(local_path, remote_path="/content/data"):
-    """Return Python code that writes a base64-encoded file to the Colab filesystem.
+2. Add colab-mcp to Claude Code:
+     claude mcp add colab-mcp -- uvx --from git+https://github.com/googlecolab/colab-mcp --python 3.13 colab-mcp
 
-    Best for small files (<10MB). For larger datasets, use HuggingFace Hub download instead.
+3. Open ~/.claude.json, find the colab-mcp entry under your project's
+   mcpServers, and make sure it looks like:
+     "colab-mcp": {
+       "command": "uvx",
+       "args": ["--from", "git+https://github.com/googlecolab/colab-mcp",
+                "--python", "3.13", "colab-mcp"],
+       "timeout": 30000
+     }
 
-    Args:
-        local_path: Path to the local file to upload.
-        remote_path: Destination path on the Colab VM.
+   Note: do NOT add --enable-runtime — proxy mode is correct and
+   --enable-runtime requires a Google OAuth config not publicly available.
 
-    Returns:
-        Python code string for execute_code.
-    """
-    if not os.path.exists(local_path):
-        raise FileNotFoundError(f"Local file not found: {local_path}")
+3. Restart Claude Code.
 
-    file_size = os.path.getsize(local_path)
-    if file_size > 10 * 1024 * 1024:  # 10MB
-        raise ValueError(
-            f"File too large for direct upload ({file_size / 1024 / 1024:.1f}MB). "
-            "Use generate_hf_download_code() for large datasets."
-        )
+4. Open a new Colab notebook at https://colab.research.google.com
+   and connect to a GPU runtime (Runtime → Change runtime type → T4 GPU).
 
-    with open(local_path, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("ascii")
+5. Confirm the MCP tools are available — you should see:
+   - execute_code
+   - open_colab_browser_connection
 
-    filename = os.path.basename(local_path)
-    return textwrap.dedent(f"""\
-        import base64, os
-        os.makedirs("{remote_path}", exist_ok=True)
-        data = base64.b64decode("{encoded}")
-        path = os.path.join("{remote_path}", "{filename}")
-        with open(path, "wb") as f:
-            f.write(data)
-        print(f"Uploaded {{len(data)}} bytes to {{path}}")
-    """)
-
-
-def generate_hf_download_code(dataset_name, split="train", remote_path="/content/data"):
-    """Return Python code to download a dataset from HuggingFace Hub on Colab.
-
-    Args:
-        dataset_name: HuggingFace dataset identifier (e.g. "yahma/alpaca-cleaned").
-        split: Dataset split to download.
-        remote_path: Where to cache the dataset.
-
-    Returns:
-        Python code string for execute_code.
-    """
-    return textwrap.dedent(f"""\
-        from datasets import load_dataset
-        ds = load_dataset("{dataset_name}", split="{split}", cache_dir="{remote_path}")
-        print(f"Downloaded {{len(ds)}} rows from {dataset_name} ({{split}})")
-        print(f"Columns: {{ds.column_names}}")
-        print(ds[0])
-    """)
-
-
-def generate_training_code(train_script_content):
-    """Return the training script content as-is for execute_code.
-
-    The agent generates train.py using the normal unsloth-buddy Phase 4 logic,
-    then passes its content here to run on Colab.
-
-    Args:
-        train_script_content: The full Python training script as a string.
-
-    Returns:
-        Python code string for execute_code.
-    """
-    return train_script_content
-
-
-def generate_download_code(remote_path, encoding="base64"):
-    """Return Python code that reads a file from Colab and prints it as base64.
-
-    The agent captures the output and decodes it locally to save the file.
-
-    Args:
-        remote_path: Path to the file on Colab VM.
-        encoding: "base64" for binary files, "text" for text files.
-
-    Returns:
-        Python code string for execute_code.
-    """
-    if encoding == "base64":
-        return textwrap.dedent(f"""\
-            import base64, os
-            path = "{remote_path}"
-            if os.path.isdir(path):
-                import tarfile, io
-                buf = io.BytesIO()
-                with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-                    tar.add(path, arcname=os.path.basename(path))
-                encoded = base64.b64encode(buf.getvalue()).decode("ascii")
-                print(f"TAR_BASE64:{{encoded}}")
-            else:
-                with open(path, "rb") as f:
-                    encoded = base64.b64encode(f.read()).decode("ascii")
-                print(f"FILE_BASE64:{{encoded}}")
-        """)
-    else:
-        return textwrap.dedent(f"""\
-            with open("{remote_path}", "r") as f:
-                print(f.read())
-        """)
-
-
-def generate_metrics_poll_code(dashboard_port=8080):
-    """Return Python code to fetch metrics from the Gaslamp dashboard running on Colab.
-
-    Used for relaying training progress back to the local dashboard.
-
-    Args:
-        dashboard_port: The port the Gaslamp dashboard server runs on.
-
-    Returns:
-        Python code string for execute_code.
-    """
-    return textwrap.dedent(f"""\
-        import requests, json
-        try:
-            r = requests.get("http://localhost:{dashboard_port}/api/metrics", timeout=5)
-            print(json.dumps(r.json()))
-        except Exception as e:
-            print(json.dumps({{"error": str(e)}}))
-    """)
-
-
-def generate_list_outputs_code(output_dir="/content/outputs"):
-    """Return Python code to list all output files from training.
-
-    Args:
-        output_dir: The training output directory on Colab.
-
-    Returns:
-        Python code string for execute_code.
-    """
-    return textwrap.dedent(f"""\
-        import os, json
-        files = []
-        for root, dirs, filenames in os.walk("{output_dir}"):
-            for fn in filenames:
-                full = os.path.join(root, fn)
-                files.append({{
-                    "path": full,
-                    "size_mb": round(os.path.getsize(full) / (1024*1024), 2)
-                }})
-        print(json.dumps(files, indent=2))
-    """)
-
-
-# ---------------------------------------------------------------------------
-# Local helpers — used by the agent to decode downloaded files
-# ---------------------------------------------------------------------------
-
-def decode_base64_output(output_text, local_path):
-    """Decode a base64-encoded file output from Colab and save locally.
-
-    Args:
-        output_text: The stdout from execute_code containing FILE_BASE64 or TAR_BASE64.
-        local_path: Where to save the decoded file locally.
-    """
-    os.makedirs(os.path.dirname(local_path) or ".", exist_ok=True)
-
-    for line in output_text.strip().split("\n"):
-        if line.startswith("FILE_BASE64:"):
-            data = base64.b64decode(line[len("FILE_BASE64:"):])
-            with open(local_path, "wb") as f:
-                f.write(data)
-            return local_path
-
-        if line.startswith("TAR_BASE64:"):
-            import tarfile
-            import io
-            data = base64.b64decode(line[len("TAR_BASE64:"):])
-            with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
-                tar.extractall(path=os.path.dirname(local_path) or ".")
-            return local_path
-
-    raise ValueError("No base64-encoded content found in output")
+   Note: "Failed to connect" before opening a Colab notebook is normal.
+   The tools become active once a runtime is connected (Step 4).
+"""
