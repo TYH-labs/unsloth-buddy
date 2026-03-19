@@ -198,7 +198,7 @@ Apple Silicon 使用者如需更大的模型或 CUDA 專屬功能，可將訓練
 
 ## 更新日誌
 
-- **2026-05-18** — 新增透過 [colab-mcp](https://github.com/googlecolab/colab-mcp) 的 Google Colab 雲端訓練支援：可在 Claude Code 中直接使用免費 T4/L4/A100 GPU，支援背景執行緒訓練、即時輪詢進度及適配器下載流程。
+- **2026-03-18** — 新增透過 [colab-mcp](https://github.com/googlecolab/colab-mcp) 的 Google Colab 雲端訓練支援：可在 Claude Code 中直接使用免費 T4/L4/A100 GPU，支援背景執行緒訓練、即時輪詢進度及適配器下載流程。
 
 ---
 
