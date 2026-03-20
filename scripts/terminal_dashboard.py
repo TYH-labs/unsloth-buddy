@@ -32,9 +32,12 @@ def fetch_metrics(port=8080):
     except Exception:
         return None
 
-def draw_dashboard(payload, theme="clear"):
-    plt.clear_terminal()
-    
+def draw_dashboard(payload, theme="clear", once=False):
+    if not once:
+        plt.clear_terminal()
+
+    is_tty = sys.stdout.isatty()
+
     # ─── 1. Extract Data ───
     phase = payload.get("phase", "unknown").upper()
     logs = payload.get("logs", [])
@@ -58,24 +61,27 @@ def draw_dashboard(payload, theme="clear"):
     max_steps = meta.get("max_steps", "?")
 
     # ─── 2. Print Clean Text Header ───
-    # Standard terminal print() is much sharper and cleaner than plotext text subplots.
+    expand_hint = "  ↕ ctrl+o to expand" if (once and not is_tty) else ""
     print("=" * 80)
-    print(f" 🚀 Gaslamp Terminal Dashboard   |   Phase: {phase}")
-    print(f" ⏱️  Step: {step} / {max_steps}           |   Elapsed: {elapsed_str}   |   ETA: {eta_str}")
+    print(f" 🚀 Gaslamp Terminal Dashboard{expand_hint}   |   Phase: {phase}")
+    print(f" ⏱️  Step: {step} / {max_steps}   |   Elapsed: {elapsed_str}   |   ETA: {eta_str}")
     print("-" * 80)
     print(f" 🖥️  Hardware: {device} ({vram} MB Peak VRAM)")
     print(f" ⚙️  Hyperparams: {optimizer}, batch={bs}x{acc}, initial_lr={peak_lr}")
     print("=" * 80)
 
     # ─── 3. Draw 1x2 Charts ───
-    plt.theme(theme)
+    plt.theme(theme if is_tty else "clear")
     plt.subplots(1, 2)
-    # Reduce height by 8 to leave room for the text header printed above
     try:
         tw, th = plt.tw(), plt.th()
-        plt.plotsize(tw, max(10, th - 8))
+        chart_h = 12 if (once and not is_tty) else max(10, th - 8)
+        plt.plotsize(min(tw or 80, 80), chart_h)
     except Exception:
-        pass # Fallback if terminal size detection fails
+        pass
+
+    # colors only when rendering in a real terminal
+    c = lambda col: col if is_tty else "default"
 
     # Left: Training Loss
     plt.subplot(1, 1)
@@ -85,13 +91,13 @@ def draw_dashboard(payload, theme="clear"):
         if "loss" in log and "step" in log:
             train_steps.append(log["step"])
             train_loss.append(log["loss"])
-            
+
     if train_loss:
         smoothed_loss = get_smoothed_loss(train_loss, alpha=0.1)
-        plt.plot(train_steps, train_loss, label="Raw Loss", color="black", marker="dot")
-        plt.plot(train_steps, smoothed_loss, label="EMA Loss", color="blue", marker="braille")
+        plt.plot(train_steps, train_loss, label="Raw Loss", color=c("black"), marker="dot")
+        plt.plot(train_steps, smoothed_loss, label="EMA Loss", color=c("blue"), marker="braille")
         avg_loss = sum(train_loss) / len(train_loss)
-        plt.hline(avg_loss, color="red")
+        plt.hline(avg_loss, color=c("red"))
         plt.title("Training Loss")
     else:
         plt.title("Training Loss (Waiting for data...)")
@@ -106,10 +112,9 @@ def draw_dashboard(payload, theme="clear"):
             eval_loss.append(log["eval_loss"])
 
     if eval_loss:
-        plt.plot(eval_steps, eval_loss, label="Eval Loss", color="green", marker="braille")
+        plt.plot(eval_steps, eval_loss, label="Eval Loss", color=c("green"), marker="braille")
         plt.title("Evaluation Loss")
     else:
-        # Fallback to Learning Rate if no evaluation has happened yet
         lr_steps = []
         lrs = []
         for log in logs:
@@ -117,12 +122,11 @@ def draw_dashboard(payload, theme="clear"):
                 lr_steps.append(log["step"])
                 lrs.append(log["learning_rate"])
         if lrs:
-            plt.plot(lr_steps, lrs, label="Learning Rate", color="yellow")
+            plt.plot(lr_steps, lrs, label="Learning Rate", color=c("yellow"))
             plt.title("Learning Rate Schedule")
         else:
             plt.title("Evaluation (Waiting for data...)")
 
-    # Render layout
     plt.show()
 
 def main():
@@ -130,10 +134,18 @@ def main():
     parser.add_argument("--port", type=int, default=8080, help="Gaslamp callback port")
     parser.add_argument("--theme", type=str, default="clear", help="Plotext theme: clear, dark, pro, matrix, ubuntu, windows, retro, elegant")
     parser.add_argument("--interval", type=float, default=2.0, help="Refresh interval (seconds)")
+    parser.add_argument("--once", action="store_true", help="Render once and exit (for Claude periodic checks)")
     args = parser.parse_args()
 
+    if args.once:
+        payload = fetch_metrics(args.port)
+        if payload:
+            draw_dashboard(payload, theme=args.theme, once=True)
+        else:
+            print(f"No training server on port {args.port} — is training running?")
+        return
+
     print(f"Connecting to Gaslamp training process on http://localhost:{args.port}...")
-    
     try:
         while True:
             payload = fetch_metrics(args.port)
@@ -145,9 +157,7 @@ def main():
             else:
                 os.system('cls' if os.name == 'nt' else 'clear')
                 print(f"Waiting for training server on port {args.port}...")
-                
             time.sleep(args.interval)
-            
     except KeyboardInterrupt:
         print("\nExiting terminal dashboard...")
         sys.exit(0)

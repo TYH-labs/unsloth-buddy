@@ -216,13 +216,22 @@ Ask the user which path they prefer if the model is >8B or requires CUDA feature
         trainer.train()
     ```
     Dashboard serves at **http://localhost:8080/** with loss, learning rate, val loss, Peak mem (GB), tokens/sec.
-- **Terminal Dashboard**: Tell the user they can also open a new interactive terminal and run `python ../scripts/terminal_dashboard.py` to view a live `plotext` UI instead of the web browser.
+- **Terminal Dashboard** (optional): The terminal dashboard requires `plotext` and `requests`. Install them into the project venv (venv is already set up by this point):
+  ```bash
+  .venv/bin/pip install plotext requests   # or: uv pip install plotext requests
+  ```
+  Tell the user they have two ways to use it:
+  - **New interactive terminal (live loop)**: `.venv/bin/python ../scripts/terminal_dashboard.py`
+  - **One-shot check inside Claude Code**: `.venv/bin/python ../scripts/terminal_dashboard.py --once`
 - Ask the user: *"Should I execute the training script now?"*
 - If approved, use your terminal tool to run it and tee stdout to `logs/train.log`:
   ```bash
   python train.py 2>&1 | tee logs/train.log
   ```
-  - Tell the user to open **http://localhost:8080/** in their browser to view live training metrics.
+  - Offer the user live monitoring options (the HTTP server starts automatically with training):
+    - **Web dashboard**: Open **http://localhost:8080/** in a browser for the live interactive dashboard.
+    - **Terminal loop**: In a new terminal, run `.venv/bin/python ../scripts/terminal_dashboard.py`
+    - **Claude one-shot check**: Run `.venv/bin/python ../scripts/terminal_dashboard.py --once` here to snapshot progress.
 - Update `progress_log.md` and `memory.md` with final loss and hyperparameters used.
 
 ### Phase 5: Evaluation & Metrics
