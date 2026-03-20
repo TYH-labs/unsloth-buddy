@@ -1,1 +1,9 @@
 _local_backup/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

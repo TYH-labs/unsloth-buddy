@@ -198,6 +198,7 @@ Apple Silicon 使用者如需更大的模型或 CUDA 專屬功能，可將訓練
 
 ## 更新日誌
 
+- **2026-03-19** — 新增終端訓練儀表板（`scripts/terminal_dashboard.py`）：在終端中即時顯示 `plotext` 損失與學習率圖表，支援 `--once` 模式供 Claude Code 一次性檢視訓練進度。
 - **2026-03-18** — 新增透過 [colab-mcp](https://github.com/googlecolab/colab-mcp) 的 Google Colab 雲端訓練支援：可在 Claude Code 中直接使用免費 T4/L4/A100 GPU，支援背景執行緒訓練、即時輪詢進度及適配器下載流程。
 
 ---

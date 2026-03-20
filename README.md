@@ -199,6 +199,7 @@ For Claude Code, Gemini CLI, Codex, or any ACP-compatible agent: provide `AGENTS
 
 ## Changelog
 
+- **2026-03-19** — Added terminal training dashboard (`scripts/terminal_dashboard.py`): live `plotext` charts of loss and learning rate in the terminal, with `--once` mode for Claude Code one-shot progress checks.
 - **2026-03-18** — Added Google Colab training support via [colab-mcp](https://github.com/googlecolab/colab-mcp): free T4/L4/A100 GPU access from Claude Code, background-thread training with live polling, and adapter download workflow.
 
 ---
