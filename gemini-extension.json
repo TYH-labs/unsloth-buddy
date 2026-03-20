@@ -21,7 +21,8 @@
     "scripts/terminal_dashboard.py",
     "scripts/colab_training.py",
     "scripts/setup_colab.py",
-    "templates/dashboard.html"
+    "templates/dashboard.html",
+    "templates/gaslamp.png"
   ],
   "schemaVersion": "1.0"
 }

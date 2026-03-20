@@ -33,7 +33,8 @@
         "./scripts/setup_colab.py"
       ],
       "templates": [
-        "./templates/dashboard.html"
+        "./templates/dashboard.html",
+        "./templates/gaslamp.png"
       ],
       "agents": [
         "./AGENTS.md"
