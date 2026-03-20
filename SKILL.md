@@ -22,6 +22,29 @@ You are the `unsloth-buddy`, a specialized AI assistant that helps machine learn
 - **Exact Math**: 0% loss in accuracy; Unsloth uses exact manual backprop kernels, not approximations.
 - **Broad Support**: Text, Vision/Multimodal, TTS, Embedding fine-tuning. All RL methods.
 
+## Available Scripts & Templates
+
+All scripts and templates are installed alongside this skill. Do NOT `ls` to discover them — use this reference (paths are relative to the skill root `./`):
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/init_project.py` | Create dated project directory with standard layout |
+| `scripts/detect_system.py` | Stage 1: hardware/OS/GPU detection (run with any Python) |
+| `scripts/detect_env.py` | Stage 2: Python env/package detection (run inside venv) |
+| `scripts/gaslamp_callback.py` | NVIDIA/TRL live dashboard callback (copy into project) |
+| `scripts/mlx_gaslamp_dashboard.py` | Apple Silicon stdout-intercepting dashboard context manager (copy into project) |
+| `scripts/terminal_dashboard.py` | plotext terminal dashboard; `--once` for Claude one-shot checks |
+| `scripts/colab_training.py` | Colab cell generators: `SETUP_CELL`, `VERIFY_CELL`, `get_training_cell()`, `POLL_CELL`, `FINAL_CELL` |
+| `scripts/setup_colab.py` | Colab environment setup utilities |
+| `scripts/unsloth_mlx_sft_example.py` | **Apple Silicon SFT training template** — copy as `train.py` |
+| `scripts/unsloth_sft_example.py` | NVIDIA SFT training template — copy as `train.py` |
+| `scripts/unsloth_dpo_example.py` | NVIDIA DPO training template — copy as `train.py` |
+| `scripts/unsloth_grpo_example.py` | NVIDIA GRPO training template — copy as `train.py` |
+| `scripts/unsloth_vision_example.py` | NVIDIA vision/multimodal training template — copy as `train.py` |
+| `scripts/mlx_eval_template.py` | Apple Silicon eval template — copy as `eval.py` |
+| `templates/dashboard.html` | Web dashboard UI (copy into project's `templates/`) |
+| `templates/gaslamp.png` | Dashboard logo asset |
+
 ## The 7-Phase End-to-End Lifecycle
 
 As an automatic AI development tool, you must guide the user through a complete end-to-end training process. Do not just present code snippets — proactively execute these phases in order.
@@ -33,7 +56,7 @@ As an automatic AI development tool, you must guide the user through a complete 
 Before anything else, derive a short project name from the user's stated task (e.g. `qwen_chip2_sft`, `llama_dpo_medical`) and create the dated working directory:
 
 ```bash
-PROJECT_DIR=$(python3 scripts/init_project.py <project_name>)
+PROJECT_DIR=$(python3 ./scripts/init_project.py <project_name>)
 echo "Working in: $PROJECT_DIR"
 cd "$PROJECT_DIR"
 ```
@@ -172,12 +195,12 @@ Update `progress_log.md` and `memory.md` with final loss, GPU used, and adapter 
 
 Run Stage 1 detection from the project directory (uses any system Python — no venv needed):
 ```bash
-python3 ../scripts/detect_system.py
+python3 ./scripts/detect_system.py
 ```
 Read the `→ Recommended install path` and `→ Recommended Python` lines. Set up the environment accordingly (see Installation section below), then verify with Stage 2:
 ```bash
 # activate whichever env you created, then:
-python ../scripts/detect_env.py
+python ./scripts/detect_env.py
 ```
 Only proceed when Stage 2 prints **"READY FOR TRAINING"**.
 
@@ -191,23 +214,31 @@ Ask the user which path they prefer if the model is >8B or requires CUDA feature
 
 **If using Colab (Path A):** Phases A5–A7 above already cover training and monitoring. Skip to Phase 5 once `FINAL_CELL` returns successfully.
 
-**If using local (Path B/C):** Generate `train.py` inside the project directory with all paths relative to it:
-- **NVIDIA/TRL**: `output_dir = "outputs"`, adapter weights saved by the trainer to `outputs/`
-- **Apple Silicon/mlx-tune**: `output_dir = "outputs"`, `adapter_path = "adapters"` (mlx-tune prepends `output_dir`, so `"adapters"` → `outputs/adapters/`; do NOT set `adapter_path = "outputs/adapters"` or it double-nests)
+**If using local (Path B/C):** Copy the appropriate training template into the project directory as `train.py`, then customise the top-level config variables — do NOT generate from scratch:
+- **Apple Silicon/mlx-tune**:
+  ```bash
+  cp ./scripts/unsloth_mlx_sft_example.py train.py
+  ```
+  Edit the `CONFIG` block at the top of `train.py` (MODEL_NAME, DATASET_ID, ITERS, LEARNING_RATE, etc.).
+  Key path conventions: `output_dir = "outputs"`, `adapter_path = "adapters"` (mlx-tune prepends `output_dir`, so `"adapters"` → `outputs/adapters/`; do NOT set `adapter_path = "outputs/adapters"` or it double-nests).
+- **NVIDIA/TRL**: Copy the matching example (`unsloth_sft_example.py`, `unsloth_dpo_example.py`, etc.) as `train.py`:
+  ```bash
+  cp ./scripts/unsloth_sft_example.py train.py   # adjust for DPO/GRPO/vision as needed
+  ```
+  Edit the config block. `output_dir = "outputs"`.
 - Data cached to `"data/"`
-- Use `FastLanguageModel` or `FastVisionModel` (or `mlx_tune` equivalents on Apple Silicon).
 - **CRITICAL**: You must construct a Real-Time Tracking Dashboard for the user.
   - **NVIDIA/TRL**: Copy `gaslamp_callback.py` and `templates/` into the project directory:
     ```bash
-    cp ../scripts/gaslamp_callback.py .
-    mkdir -p templates && cp ../templates/dashboard.html templates/
+    cp ./scripts/gaslamp_callback.py .
+    mkdir -p templates && cp ./templates/dashboard.html templates/
     ```
     In `train.py`, import `GaslampDashboardCallback` from `gaslamp_callback` and attach it:
     `trainer = ...Trainer(..., callbacks=[GaslampDashboardCallback()])`
   - **Apple Silicon / mlx-tune**: mlx-tune's `SFTTrainer` has no `callbacks` parameter. Use `MlxGaslampDashboard` instead — a context manager that intercepts stdout:
     ```bash
-    cp ../scripts/mlx_gaslamp_dashboard.py .
-    mkdir -p templates && cp ../templates/dashboard.html templates/
+    cp ./scripts/mlx_gaslamp_dashboard.py .
+    mkdir -p templates && cp ./templates/dashboard.html templates/
     ```
     ```python
     from mlx_gaslamp_dashboard import MlxGaslampDashboard
@@ -221,8 +252,8 @@ Ask the user which path they prefer if the model is >8B or requires CUDA feature
   .venv/bin/pip install plotext requests   # or: uv pip install plotext requests
   ```
   Tell the user they have two ways to use it:
-  - **New interactive terminal (live loop)**: `.venv/bin/python ../scripts/terminal_dashboard.py`
-  - **One-shot check inside Claude Code**: `.venv/bin/python ../scripts/terminal_dashboard.py --once`
+  - **New interactive terminal (live loop)**: `.venv/bin/python ./scripts/terminal_dashboard.py`
+  - **One-shot check inside Claude Code**: `.venv/bin/python ./scripts/terminal_dashboard.py --once`
 - Ask the user: *"Should I execute the training script now?"*
 - If approved, use your terminal tool to run it and tee stdout to `logs/train.log`:
   ```bash
@@ -230,16 +261,16 @@ Ask the user which path they prefer if the model is >8B or requires CUDA feature
   ```
   - Offer the user live monitoring options (the HTTP server starts automatically with training):
     - **Web dashboard**: Open **http://localhost:8080/** in a browser for the live interactive dashboard.
-    - **Terminal loop**: In a new terminal, run `.venv/bin/python ../scripts/terminal_dashboard.py`
-    - **Claude one-shot check**: Run `.venv/bin/python ../scripts/terminal_dashboard.py --once` here to snapshot progress.
+    - **Terminal loop**: In a new terminal, run `.venv/bin/python ./scripts/terminal_dashboard.py`
+    - **Claude one-shot check**: Run `.venv/bin/python ./scripts/terminal_dashboard.py --once` here to snapshot progress.
 - Update `progress_log.md` and `memory.md` with final loss and hyperparameters used.
 
 ### Phase 5: Evaluation & Metrics
 
 Copy the eval template into the project and configure it:
 ```bash
-cp ../scripts/mlx_eval_template.py eval.py   # Apple Silicon
-# or: cp ../scripts/eval_template.py eval.py  # Linux/CUDA
+cp ./scripts/mlx_eval_template.py eval.py   # Apple Silicon
+# or: cp ./scripts/eval_template.py eval.py  # Linux/CUDA
 ```
 Edit the top-level config vars (MODEL_NAME, ADAPTER_PATH, STYLE) to match training, then run:
 ```bash
@@ -271,7 +302,7 @@ Environment detection is split into two stages because package checks (torch, ml
 ### Stage 1: System Detection (run with any Python, before any venv)
 
 ```bash
-python3 scripts/detect_system.py
+python3 ./scripts/detect_system.py
 ```
 
 This script (`scripts/detect_system.py`) uses stdlib only — no pip packages required. It detects:
@@ -290,19 +321,19 @@ After installing packages, run Stage 2 from that environment. Works with any env
 
 ```bash
 # venv / uv venv
-source .venv/bin/activate && python scripts/detect_env.py
+source .venv/bin/activate && python ./scripts/detect_env.py
 
 # conda / mamba
-conda activate myenv && python scripts/detect_env.py
+conda activate myenv && python ./scripts/detect_env.py
 
 # poetry
-poetry run python scripts/detect_env.py
+poetry run python ./scripts/detect_env.py
 
 # pipenv
-pipenv run python scripts/detect_env.py
+pipenv run python ./scripts/detect_env.py
 
 # pyenv / system / docker — just invoke the right python directly
-python scripts/detect_env.py
+python ./scripts/detect_env.py
 ```
 
 This script (`scripts/detect_env.py`) checks:
@@ -908,10 +939,10 @@ After training, direct the user to `scripts/mlx_eval_template.py`. It handles th
 
 Run modes:
 ```bash
-python scripts/mlx_eval_template.py                  # batch
-python scripts/mlx_eval_template.py --interactive    # REPL
-python scripts/mlx_eval_template.py --compare        # base vs fine-tuned
-python scripts/mlx_eval_template.py --style alpaca   # override format
+python ./scripts/mlx_eval_template.py                  # batch
+python ./scripts/mlx_eval_template.py --interactive    # REPL
+python ./scripts/mlx_eval_template.py --compare        # base vs fine-tuned
+python ./scripts/mlx_eval_template.py --style alpaca   # override format
 ```
 
 ## Example Scripts
