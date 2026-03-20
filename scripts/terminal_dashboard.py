@@ -63,7 +63,7 @@ def draw_dashboard(payload):
         plt.plot(train_steps, train_loss, label="Raw Loss", color="black", marker="dot")
         plt.plot(train_steps, smoothed_loss, label="EMA Loss", color="blue", marker="braille")
         avg_loss = sum(train_loss) / len(train_loss)
-        plt.hline(avg_loss, color="red", label="Avg")
+        plt.hline(avg_loss, color="red")
         plt.title("Training Loss")
     else:
         plt.title("Training Loss (Waiting for data...)")
