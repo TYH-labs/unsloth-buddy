@@ -151,6 +151,7 @@ Every local training run automatically opens a real-time dashboard at **http://l
 - **Gradient norm** — fades in when data arrives
 - **Evaluation metrics** — auto-reveals eval loss / accuracy with animated empty states
 - **Peak VRAM** — tracks GPU (CUDA) and Apple MPS memory usage
+- **Terminal UI (Plotext)** — optional `scripts/terminal_dashboard.py` for monitoring directly in the CLI
 
 Works on both NVIDIA (via `GaslampDashboardCallback`) and Apple Silicon (via `MlxGaslampDashboard` stdout interceptor).
 

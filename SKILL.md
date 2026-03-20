@@ -216,6 +216,7 @@ Ask the user which path they prefer if the model is >8B or requires CUDA feature
         trainer.train()
     ```
     Dashboard serves at **http://localhost:8080/** with loss, learning rate, val loss, Peak mem (GB), tokens/sec.
+- **Terminal Dashboard**: Tell the user they can also open a new interactive terminal and run `python ../scripts/terminal_dashboard.py` to view a live `plotext` UI instead of the web browser.
 - Ask the user: *"Should I execute the training script now?"*
 - If approved, use your terminal tool to run it and tee stdout to `logs/train.log`:
   ```bash
@@ -915,6 +916,7 @@ See the `scripts/` directory for ready-to-use templates:
 - **`scripts/mlx_eval_template.py`**: Evaluation template for Apple Silicon / mlx-tune (batch, interactive, compare modes).
 - **`scripts/setup_colab.py`**: Auto-setup Unsloth on a Google Colab VM (GPU detection, install, verification).
 - **`scripts/colab_training.py`**: Helper module for remote Colab training (upload, execute, download, metrics polling).
+- **`scripts/terminal_dashboard.py`**: Standalone terminal UI using plotext.
 
 ## Resources
 
