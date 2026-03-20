@@ -32,11 +32,11 @@ def fetch_metrics(port=8080):
     except Exception:
         return None
 
-def draw_dashboard(payload):
+def draw_dashboard(payload, theme="clear"):
     plt.clear_terminal()
     
-    # Extract data
-    phase = payload.get("phase", "unknown")
+    # ─── 1. Extract Data ───
+    phase = payload.get("phase", "unknown").upper()
     logs = payload.get("logs", [])
     hw = payload.get("hardware", {})
     hp = payload.get("hyperparameters", {})
@@ -44,12 +44,40 @@ def draw_dashboard(payload):
     eta_sec = payload.get("eta_seconds", 0) or 0
     elapsed_sec = payload.get("elapsed_seconds", 0) or 0
 
-    # Layout configuration
-    plt.theme("clear")
-    plt.subplots(2, 2)
-    plt.plotsize(plt.tw(), plt.th())
-    
-    # ─── Top Left: Training Loss ───
+    device = hw.get("device", "Unknown GPU")
+    vram = hw.get("peak_vram_mb", 0)
+    optimizer = hp.get("optimizer", "Auto")
+    bs = hp.get("train_batch_size", "?")
+    acc = hp.get("gradient_accumulation", "?")
+    peak_lr = hp.get("learning_rate", "?")
+
+    eta_str = str(datetime.timedelta(seconds=int(eta_sec))) if eta_sec > 0 else "Calculating..."
+    elapsed_str = str(datetime.timedelta(seconds=int(elapsed_sec)))
+
+    step = logs[-1].get("step", 0) if logs else 0
+    max_steps = meta.get("max_steps", "?")
+
+    # ─── 2. Print Clean Text Header ───
+    # Standard terminal print() is much sharper and cleaner than plotext text subplots.
+    print("=" * 80)
+    print(f" 🚀 Gaslamp Terminal Dashboard   |   Phase: {phase}")
+    print(f" ⏱️  Step: {step} / {max_steps}           |   Elapsed: {elapsed_str}   |   ETA: {eta_str}")
+    print("-" * 80)
+    print(f" 🖥️  Hardware: {device} ({vram} MB Peak VRAM)")
+    print(f" ⚙️  Hyperparams: {optimizer}, batch={bs}x{acc}, initial_lr={peak_lr}")
+    print("=" * 80)
+
+    # ─── 3. Draw 1x2 Charts ───
+    plt.theme(theme)
+    plt.subplots(1, 2)
+    # Reduce height by 8 to leave room for the text header printed above
+    try:
+        tw, th = plt.tw(), plt.th()
+        plt.plotsize(tw, max(10, th - 8))
+    except Exception:
+        pass # Fallback if terminal size detection fails
+
+    # Left: Training Loss
     plt.subplot(1, 1)
     train_steps = []
     train_loss = []
@@ -67,76 +95,40 @@ def draw_dashboard(payload):
         plt.title("Training Loss")
     else:
         plt.title("Training Loss (Waiting for data...)")
-        
-    # ─── Top Right: Learning Rate ───
-    plt.subplot(1, 2)
-    lr_steps = []
-    lrs = []
-    for log in logs:
-        if "learning_rate" in log and "step" in log:
-            lr_steps.append(log["step"])
-            lrs.append(log["learning_rate"])
-            
-    if lrs:
-        plt.plot(lr_steps, lrs, label="Learning Rate", color="yellow")
-        plt.title("Learning Rate Schedule")
-    else:
-        plt.title("Learning Rate (Waiting for data...)")
 
-    # ─── Bottom Left: Quick Stats ───
-    plt.subplot(2, 1)
-    eta_str = str(datetime.timedelta(seconds=int(eta_sec))) if eta_sec > 0 else "Calculating..."
-    elapsed_str = str(datetime.timedelta(seconds=int(elapsed_sec)))
-    
-    device = hw.get("device", "Unknown")
-    vram = hw.get("peak_vram_mb", 0)
-    
-    stats_text = (
-        f"--- Gaslamp Terminal Dashboard ---\n\n"
-        f"Phase: {phase.upper()}\n"
-        f"Step: {train_steps[-1] if train_steps else 0} / {meta.get('max_steps', '?')}\n"
-        f"Elapsed Time: {elapsed_str}\n"
-        f"Time Remaining: {eta_str}\n\n"
-        f"--- Hardware ---\n"
-        f"Device: {device}\n"
-        f"Peak VRAM: {vram} MB\n\n"
-        f"--- Hyperparameters ---\n"
-        f"Optimizer: {hp.get('optimizer', 'Unknown')}\n"
-        f"Batch Size: {hp.get('train_batch_size', '?')} (Acc: {hp.get('gradient_accumulation', '?')})\n"
-        f"Peak LR: {hp.get('learning_rate', '?')}\n"
-    )
-    # Since plotext doesn't strictly have a "text box" in subplots easily,
-    # we can use a scatter plot with no markers and a title, then just print 
-    # the text, but a cleaner way is just an empty plot with title, 
-    # relying on the terminal printing after layout.
-    # Alternatively, use a bar chart for categorical data if we want.
-    plt.title("Overview")
-    plt.xticks([])
-    plt.yticks([])
-    plt.text(stats_text, 0, 0, alignment="center") # Simple text center hack
-    
-    # ─── Bottom Right: Evaluation Metrics ───
-    plt.subplot(2, 2)
+    # Right: Eval Loss (or Learning Rate if no eval data yet)
+    plt.subplot(1, 2)
     eval_steps = []
     eval_loss = []
     for log in logs:
         if "eval_loss" in log and "step" in log:
             eval_steps.append(log["step"])
             eval_loss.append(log["eval_loss"])
-            
+
     if eval_loss:
         plt.plot(eval_steps, eval_loss, label="Eval Loss", color="green", marker="braille")
         plt.title("Evaluation Loss")
     else:
-        plt.title("Evaluation Loss (Waiting for eval...)")
+        # Fallback to Learning Rate if no evaluation has happened yet
+        lr_steps = []
+        lrs = []
+        for log in logs:
+            if "learning_rate" in log and "step" in log:
+                lr_steps.append(log["step"])
+                lrs.append(log["learning_rate"])
+        if lrs:
+            plt.plot(lr_steps, lrs, label="Learning Rate", color="yellow")
+            plt.title("Learning Rate Schedule")
+        else:
+            plt.title("Evaluation (Waiting for data...)")
 
     # Render layout
     plt.show()
 
-
 def main():
     parser = argparse.ArgumentParser(description="Gaslamp Terminal Dashboard")
     parser.add_argument("--port", type=int, default=8080, help="Gaslamp callback port")
+    parser.add_argument("--theme", type=str, default="clear", help="Plotext theme: clear, dark, pro, matrix, ubuntu, windows, retro, elegant")
     parser.add_argument("--interval", type=float, default=2.0, help="Refresh interval (seconds)")
     args = parser.parse_args()
 
@@ -146,8 +138,8 @@ def main():
         while True:
             payload = fetch_metrics(args.port)
             if payload:
-                draw_dashboard(payload)
-                if payload.get("phase") in ["completed", "error"]:
+                draw_dashboard(payload, theme=args.theme)
+                if payload.get("phase", "").lower() in ["completed", "error"]:
                     print(f"\nTraining finished with state: {payload.get('phase')}")
                     break
             else:
