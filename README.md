@@ -21,6 +21,11 @@
 </p>
 
 <p align="center">
+  <a href="https://youtu.be/wG28uxDGjHE"><img src="https://img.shields.io/badge/▶%20Demo-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube Demo" /></a>
+  <a href="https://www.bilibili.com/video/BV1VWAFzmECy/"><img src="https://img.shields.io/badge/▶%20演示-Bilibili-00A1D6?style=for-the-badge&logo=bilibili&logoColor=white" alt="Bilibili Demo" /></a>
+</p>
+
+<p align="center">
   English | <a href="README_zh-Hans.md">简体中文</a> | <a href="README_zh-Hant.md">繁體中文</a>
 </p>
 
