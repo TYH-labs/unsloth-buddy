@@ -247,22 +247,25 @@ Ask the user which path they prefer if the model is >8B or requires CUDA feature
         trainer.train()
     ```
     Dashboard serves at **http://localhost:8080/** with loss, learning rate, val loss, Peak mem (GB), tokens/sec.
-- **Terminal Dashboard** (optional): The terminal dashboard requires `plotext` and `requests`. Install them into the project venv (venv is already set up by this point):
+- **Terminal Dashboard** — ALWAYS install and present this to the user before starting training, regardless of response language. Do not skip this step. Install `plotext` and `requests` now (venv is already set up):
   ```bash
-  .venv/bin/pip install plotext requests   # or: uv pip install plotext requests
+  uv pip install plotext requests   # for uv venvs (preferred)
+  # fallback if not using uv: pip install plotext requests
   ```
-  Tell the user they have two ways to use it:
-  - **New interactive terminal (live loop)**: `.venv/bin/python ./scripts/terminal_dashboard.py`
-  - **One-shot check inside Claude Code**: `.venv/bin/python ./scripts/terminal_dashboard.py --once`
+  > Note: `.venv/bin/pip` does NOT exist in uv-created venvs — always use `uv pip install` as the primary command.
+
+  Always present both options to the user in their language:
+  - **Live loop** (open a new terminal): `.venv/bin/python ./scripts/terminal_dashboard.py`
+  - **One-shot snapshot** (inside Claude Code): `.venv/bin/python ./scripts/terminal_dashboard.py --once`
 - Ask the user: *"Should I execute the training script now?"*
 - If approved, use your terminal tool to run it and tee stdout to `logs/train.log`:
   ```bash
   python train.py 2>&1 | tee logs/train.log
   ```
-  - Offer the user live monitoring options (the HTTP server starts automatically with training):
+  - Remind the user of live monitoring options (the HTTP server starts automatically with training):
     - **Web dashboard**: Open **http://localhost:8080/** in a browser for the live interactive dashboard.
-    - **Terminal loop**: In a new terminal, run `.venv/bin/python ./scripts/terminal_dashboard.py`
-    - **Claude one-shot check**: Run `.venv/bin/python ./scripts/terminal_dashboard.py --once` here to snapshot progress.
+    - **Terminal live loop**: In a new terminal, run `.venv/bin/python ./scripts/terminal_dashboard.py`
+    - **Terminal one-shot**: Run `.venv/bin/python ./scripts/terminal_dashboard.py --once` here to snapshot progress.
 - Update `progress_log.md` and `memory.md` with final loss and hyperparameters used.
 
 ### Phase 5: Evaluation & Metrics
