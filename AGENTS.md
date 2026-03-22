@@ -28,6 +28,7 @@ sub-skills/data.md        ← Phase 2: data acquisition and formatting
 scripts/detect_system.py  ← Phase 3: hardware detection (Stage 1)
 scripts/detect_env.py     ← Phase 3: env/package detection (Stage 2)
 scripts/init_project.py   ← Phase 0: create dated project directory
+scripts/demo_server.py    ← mock dashboard server for UI testing (--task sft|dpo|grpo|vision)
 ```
 
 ## Lifecycle (7 Phases)

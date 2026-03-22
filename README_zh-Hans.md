@@ -149,15 +149,20 @@ Unsloth 相比标准 HuggingFace 训练速度快约 2 倍，VRAM 使用量减少
 
 每次本地训练都会自动在 **http://localhost:8080/** 打开实时看板：
 
+- **任务感知面板** — 传入 `task_type="sft"|"dpo"|"grpo"|"vision"` 自动启用对应图表
 - **SSE 流式传输** — 通过 `EventSource` 即时推送更新，无轮询延迟
 - **EMA 平滑损失** — 清晰的趋势线覆盖嘈杂的原始损失，附带运行均值
-- **动态阶段徽章** — 空闲 → 训练中 → 已完成 / 错误
-- **ETA 与已用时间** — 根据步骤进度估算剩余时间
-- **梯度范数** — 有数据时自动显示
-- **评估指标** — 带动画空状态的评估损失/准确率
-- **峰值 VRAM** — 追踪 GPU（CUDA）和 Apple MPS 内存用量
+- **动态阶段徽章** — 空闲 → 训练中 → 已完成 / 错误，含色彩标识的任务类型徽章
+- **ETA、已用时间与轮次** — 剩余时间估算及当前 epoch 进度
+- **GPU 内存分解** — 基线（模型加载）vs LoRA 训练开销 vs 总量，以仪表条形式展示（与 unsloth-studio Colab 输出一致）
+- **GRPO 面板** — 奖励 ± 标准差置信带 + KL 散度图表
+- **DPO 面板** — 选中 vs 拒绝奖励 + KL 散度图表
+- **梯度范数与 tokens/sec** — 实时统计行，有数据时自动显示
+- **训练完成摘要横幅** — 训练结束时展示最终内存与运行时间统计
+- **终端 UI (Plotext)** — `scripts/terminal_dashboard.py` 支持 `--once` 一次性快照；DPO/GRPO 自动升级为 2×2 布局
+- **演示服务器** — `python scripts/demo_server.py --task grpo` 提供丰富的模拟数据，无需 GPU 即可预览所有面板
 
-同时支持 NVIDIA（通过 `GaslampDashboardCallback`）和 Apple Silicon（通过 `MlxGaslampDashboard` 标准输出拦截器）。
+同时支持 NVIDIA（通过 `GaslampDashboardCallback(task_type=...)`）和 Apple Silicon（通过 `MlxGaslampDashboard(task_type=...)`）。
 
 ---
 
@@ -203,6 +208,7 @@ Apple Silicon 用户如需更大的模型或 CUDA 专属功能，可将训练卸
 
 ## 更新日志
 
+- **2026-03-21** — 增强训练看板：任务感知面板（SFT/DPO/GRPO/Vision）、GPU 内存分解（基线 vs LoRA vs 总量）、GRPO 奖励 ± 标准差及 KL 散度图表、DPO 选中/拒绝奖励及 KL 图表、轮次追踪、训练完成摘要横幅、终端 DPO/GRPO 2×2 布局，以及新增 `scripts/demo_server.py` 无需 GPU 即可预览所有面板的模拟服务器。
 - **2026-03-19** — 新增终端训练看板（`scripts/terminal_dashboard.py`）：在终端中实时显示 `plotext` 损失和学习率图表，支持 `--once` 模式供 Claude Code 一次性检查训练进度。
 - **2026-03-18** — 新增通过 [colab-mcp](https://github.com/googlecolab/colab-mcp) 的 Google Colab 云端训练支持：可在 Claude Code 中直接使用免费 T4/L4/A100 GPU，支持后台线程训练、实时轮询进度及适配器下载流程。
 

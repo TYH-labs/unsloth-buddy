@@ -19,6 +19,7 @@
     "scripts/unsloth_mlx_sft_example.py",
     "scripts/mlx_gaslamp_dashboard.py",
     "scripts/terminal_dashboard.py",
+    "scripts/demo_server.py",
     "scripts/colab_training.py",
     "scripts/setup_colab.py",
     "templates/dashboard.html",

@@ -42,6 +42,7 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 | `scripts/unsloth_grpo_example.py` | NVIDIA GRPO training template — copy as `train.py` |
 | `scripts/unsloth_vision_example.py` | NVIDIA vision/multimodal training template — copy as `train.py` |
 | `scripts/mlx_eval_template.py` | Apple Silicon eval template — copy as `eval.py` |
+| `scripts/demo_server.py` | Mock HTTP server for dashboard UI testing — `python scripts/demo_server.py --task sft\|dpo\|grpo\|vision --port 8080` |
 | `templates/dashboard.html` | Web dashboard UI (copy into project's `templates/`) |
 | `templates/gaslamp.png` | Dashboard logo asset |
 
