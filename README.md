@@ -149,16 +149,20 @@ Unsloth is ~2× faster than standard HuggingFace training, uses up to 80% less V
 
 Every local training run automatically opens a real-time dashboard at **http://localhost:8080/**:
 
+- **Task-aware panels** — pass `task_type="sft"|"dpo"|"grpo"|"vision"` to unlock the right charts automatically
 - **SSE streaming** — instant updates via `EventSource`, no polling lag
 - **EMA smoothed loss** — clear trend line over noisy raw loss, plus running average
-- **Dynamic phase badge** — idle → training → completed / error
-- **ETA & elapsed time** — estimated time remaining based on step progress
-- **Gradient norm** — fades in when data arrives
-- **Evaluation metrics** — auto-reveals eval loss / accuracy with animated empty states
-- **Peak VRAM** — tracks GPU (CUDA) and Apple MPS memory usage
-- **Terminal UI (Plotext)** — optional `scripts/terminal_dashboard.py` for monitoring directly in the CLI
+- **Dynamic phase badge** — idle → training → completed / error, with colour-coded task-type badge
+- **ETA, elapsed time & epoch** — estimated time remaining and current epoch progress
+- **GPU memory breakdown** — baseline (model load) vs LoRA training overhead vs total, shown as gauge bars (mirrors unsloth-studio Colab output)
+- **GRPO panels** — reward ± std-dev confidence band + KL divergence chart
+- **DPO panels** — chosen vs rejected reward + KL divergence chart
+- **Gradient norm & tokens/sec** — live stats row, fades in when data arrives
+- **Completed summary banner** — final memory and runtime stats on training end
+- **Terminal UI (Plotext)** — `scripts/terminal_dashboard.py` with `--once` for CLI snapshots; upgrades to 2×2 layout for DPO/GRPO
+- **Demo server** — `python scripts/demo_server.py --task grpo` serves rich mock data so you can preview every panel without a GPU
 
-Works on both NVIDIA (via `GaslampDashboardCallback`) and Apple Silicon (via `MlxGaslampDashboard` stdout interceptor).
+Works on both NVIDIA (via `GaslampDashboardCallback(task_type=...)`) and Apple Silicon (via `MlxGaslampDashboard(task_type=...)`).
 
 ---
 
@@ -204,6 +208,7 @@ For Claude Code, Gemini CLI, Codex, or any ACP-compatible agent: provide `AGENTS
 
 ## Changelog
 
+- **2026-03-21** — Enhanced training dashboard: task-aware panels (SFT/DPO/GRPO/Vision), GPU memory breakdown (baseline vs LoRA vs total), GRPO reward ± std and KL divergence charts, DPO chosen/rejected reward and KL charts, epoch tracking, completed-training summary banner, terminal 2×2 layout for DPO/GRPO, and new `scripts/demo_server.py` mock server for UI development without a GPU.
 - **2026-03-19** — Added terminal training dashboard (`scripts/terminal_dashboard.py`): live `plotext` charts of loss and learning rate in the terminal, with `--once` mode for Claude Code one-shot progress checks.
 - **2026-03-18** — Added Google Colab training support via [colab-mcp](https://github.com/googlecolab/colab-mcp): free T4/L4/A100 GPU access from Claude Code, background-thread training with live polling, and adapter download workflow.
 
