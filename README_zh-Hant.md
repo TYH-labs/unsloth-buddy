@@ -102,6 +102,7 @@ git clone https://github.com/TYH-labs/unsloth-buddy.git .agents/skills/unsloth-b
 | **「Unsloth 在我的機器上安裝不了」** | 兩階段環境偵測捕獲不相符問題，並印出適合你環境的精確安裝指令 |
 | **「我訓練好了，但它有效嗎？」** | 將微調適配器與基礎模型並排執行，讓你看到差異，而不只是一個損失數值 |
 | **「怎麼部署？」** | 你指定目標（Ollama、vLLM、HF Hub）— 它執行轉換指令 |
+| **「之後怎麼復現，或者交給別人？」** | 每個專案都會產生一份 `gaslamp.md` 路書：記錄每個已確定的決策及其原因，並附帶 📖 學習模組說明底層 ML 概念，任何 Agent 或人員都可以端到端復現整個專案 |
 
 ---
 
@@ -111,7 +112,7 @@ git clone https://github.com/TYH-labs/unsloth-buddy.git .agents/skills/unsloth-b
 
 | 階段 | 發生的事 | 產出檔案 |
 |---|---|---|
-| **0. 初始化** | 建立 `{name}_{date}/` 標準目錄結構 | `progress_log.md` |
+| **0. 初始化** | 建立 `{name}_{date}/` 標準目錄結構 | `gaslamp.md`、`progress_log.md` |
 | **1. 訪談** | 5 點 Unsloth 合約 — 方法、模型、資料、硬體、部署 | `project_brief.md` |
 | **2. 資料** | 取得、驗證並格式化為訓練器 schema | `data_strategy.md` |
 | **3. 環境** | 硬體掃描 → Python 環境檢查 → 阻塞直到就緒 | `detect_env_result.json` |
@@ -124,6 +125,7 @@ customer_faq_sft_2026_03_17/
 ├── train.py              eval.py
 ├── data/                 outputs/adapters/
 ├── logs/
+├── gaslamp.md            ← 可復現路書
 ├── project_brief.md      data_strategy.md
 ├── memory.md             progress_log.md
 ```
@@ -187,6 +189,8 @@ Apple Silicon 使用者如需更大的模型或 CUDA 專屬功能，可將訓練
 
 `unsloth-buddy` 可獨立使用，也可作為 [Gaslamp](https://gaslamp.dev/) 大型專案的一部分執行 — Gaslamp 是一個協調從研究到訓練再到部署整個 ML 生命週期的 Agentic 平台。透過 Gaslamp 呼叫時，專案目錄和狀態在各個技能之間共享，結果會自動傳遞到下一階段。
 
+每個專案還會產生一份 **`gaslamp.md` 路書** — 記錄所有已確定的決策及其原因，並附帶 📖 底層 ML 概念學習模組。任何 Agent 或人員都可以將此檔案交給新會話，端到端復現整個專案，或用於理解每個決策背後的原因。
+
 [gaslamp.dev/unsloth](https://gaslamp.dev/unsloth) — [gaslamp.dev](https://gaslamp.dev/)
 
 ---
@@ -208,6 +212,7 @@ Apple Silicon 使用者如需更大的模型或 CUDA 專屬功能，可將訓練
 
 ## 更新日誌
 
+- **2026-03-22** — 新增 `gaslamp.md` 可復現路書：每個專案現在都會記錄所有已確定的決策及其原因，並附帶 📖 ML 概念學習模組（方法、模型、資料、超參數、評估、匯出），任何 Agent 或人員均可端到端復現專案並理解每個決策背後的原因。範本檔案位於 `templates/gaslamp_template.md`，由 `init_project.py` 自動產生。
 - **2026-03-21** — 增強訓練儀表板：任務感知面板（SFT/DPO/GRPO/Vision）、GPU 記憶體分解（基線 vs LoRA vs 總量）、GRPO 獎勵 ± 標準差及 KL 散度圖表、DPO 選取/拒絕獎勵及 KL 圖表、輪次追蹤、訓練完成摘要橫幅、終端 DPO/GRPO 2×2 配置，以及新增 `scripts/demo_server.py` 無需 GPU 即可預覽所有面板的模擬伺服器。
 - **2026-03-19** — 新增終端訓練儀表板（`scripts/terminal_dashboard.py`）：在終端中即時顯示 `plotext` 損失與學習率圖表，支援 `--once` 模式供 Claude Code 一次性檢視訓練進度。
 - **2026-03-18** — 新增透過 [colab-mcp](https://github.com/googlecolab/colab-mcp) 的 Google Colab 雲端訓練支援：可在 Claude Code 中直接使用免費 T4/L4/A100 GPU，支援背景執行緒訓練、即時輪詢進度及適配器下載流程。

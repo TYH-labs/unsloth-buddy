@@ -22,20 +22,21 @@ Activate when the user says anything like:
 Read `SKILL.md` — it defines the full 7-phase lifecycle. Then read `sub-skills/interview.md` and `sub-skills/data.md` for the interview and data phases.
 
 ```
-SKILL.md                  ← main orchestration logic
-sub-skills/interview.md   ← Phase 1: 5-point requirements interview
-sub-skills/data.md        ← Phase 2: data acquisition and formatting
-scripts/detect_system.py  ← Phase 3: hardware detection (Stage 1)
-scripts/detect_env.py     ← Phase 3: env/package detection (Stage 2)
-scripts/init_project.py   ← Phase 0: create dated project directory
-scripts/demo_server.py    ← mock dashboard server for UI testing (--task sft|dpo|grpo|vision)
+SKILL.md                       ← main orchestration logic
+sub-skills/interview.md        ← Phase 1: 5-point requirements interview
+sub-skills/data.md             ← Phase 2: data acquisition and formatting
+scripts/detect_system.py       ← Phase 3: hardware detection (Stage 1)
+scripts/detect_env.py          ← Phase 3: env/package detection (Stage 2)
+scripts/init_project.py        ← Phase 0: create dated project directory + gaslamp.md
+scripts/demo_server.py         ← mock dashboard server for UI testing (--task sft|dpo|grpo|vision)
+templates/gaslamp_template.md  ← roadbook template (copied as gaslamp.md into each project)
 ```
 
 ## Lifecycle (7 Phases)
 
 | Phase | What you do |
 |-------|-------------|
-| 0. Init | Run `python scripts/init_project.py <name>` → creates `{name}_{date}/` |
+| 0. Init | Run `python scripts/init_project.py <name>` → creates `{name}_{date}/` with `gaslamp.md` roadbook |
 | 1. Interview | Ask the 5-point Unsloth Contract questions (method, model, data, hardware, deploy) |
 | 2. Data | Acquire, validate, and reformat the dataset to the required schema |
 | 3. Env | Run detect_system.py then detect_env.py — block until READY |
@@ -51,3 +52,5 @@ Everything is scoped to the dated project directory. Nothing touches the repo ro
 - NVIDIA: use `unsloth`, CUDA 12.1+
 - Never run training without completing Phase 3 (env check)
 - Adapter path must be passed as kwarg to `from_pretrained` for eval to load correctly
+- **On resuming a project**: read `gaslamp.md` first — it is the authoritative record of all decisions already made
+- **`gaslamp.md` vs `memory.md`**: gaslamp.md records only final kept decisions + rationale + 📖 learn blocks (reproducible); memory.md is free-form working notes (session only)

@@ -11,8 +11,9 @@ Creates:
     ├── outputs/
     │   └── adapters/       # LoRA adapter weights
     ├── logs/               # training stdout/stderr logs
-    ├── memory.md           # technical context: hyperparams, dataset notes, discoveries
-    └── progress_log.md     # chronological record of each phase
+    ├── gaslamp.md          # roadbook: key decisions + rationale + learning warmup (reproducible)
+    ├── memory.md           # working notes: discoveries, debugging, in-progress findings
+    └── progress_log.md     # chronological session log of each phase
 
 Prints the project directory path to stdout so the caller can cd into it.
 """
@@ -42,6 +43,19 @@ else:
     (project_dir / "outputs" / "adapters").mkdir(parents=True)
     (project_dir / "logs").mkdir(parents=True)
     print(f"[init] Created project directory: {project_dir}", file=sys.stderr)
+
+# ── gaslamp.md (roadbook) — copied from templates/gaslamp_template.md ────────
+gaslamp_file = project_dir / "gaslamp.md"
+if not gaslamp_file.exists():
+    # Locate the template relative to this script (scripts/ → templates/)
+    template_path = Path(__file__).parent.parent / "templates" / "gaslamp_template.md"
+    if template_path.exists():
+        content = template_path.read_text()
+        # Substitute {project_name} placeholder
+        content = content.replace("{project_name}", project_name)
+        gaslamp_file.write_text(content)
+    else:
+        print(f"[init] Warning: gaslamp_template.md not found at {template_path}", file=sys.stderr)
 
 # ── memory.md ────────────────────────────────────────────────────────────────
 memory_file = project_dir / "memory.md"
