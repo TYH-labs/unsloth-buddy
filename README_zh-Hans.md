@@ -138,7 +138,7 @@ customer_faq_sft_2026_03_17/
 |---|---|---|
 | NVIDIA T4 (16 GB) | `unsloth` | 7B QLoRA，小规模 GRPO |
 | NVIDIA A100 (80 GB) | `unsloth` | 70B QLoRA，14B LoRA 16-bit |
-| Apple M1 / M2 / M3 / M4 | `mlx-tune` | 10 GB 统一内存跑 7B，24 GB 跑 13B |
+| Apple M1 / M2 / M3 / M4 | `mlx-tune` / `trl` | SFT/DPO：10 GB 跑 7B，24 GB 跑 13B；GRPO：1–7B（TRL + PyTorch MPS）|
 | Google Colab (T4/L4/A100) | `unsloth` 通过 `colab-mcp` | 免费云端 GPU，可选接入 |
 
 Unsloth 相比标准 HuggingFace 训练速度快约 2 倍，VRAM 使用量减少高达 80%，且使用精确梯度。
@@ -156,13 +156,13 @@ Unsloth 相比标准 HuggingFace 训练速度快约 2 倍，VRAM 使用量减少
 - **EMA 平滑损失** — 清晰的趋势线覆盖嘈杂的原始损失，附带运行均值
 - **动态阶段徽章** — 空闲 → 训练中 → 已完成 / 错误，含色彩标识的任务类型徽章
 - **ETA、已用时间与轮次** — 剩余时间估算及当前 epoch 进度
-- **GPU 内存分解** — 基线（模型加载）vs LoRA 训练开销 vs 总量，以仪表条形式展示（与 unsloth-studio Colab 输出一致）
+- **GPU 内存分解** — 基线（模型加载）vs LoRA 训练开销 vs 总量，以仪表条形式展示；同时支持 NVIDIA（CUDA）和 Apple Silicon（MPS，使用 `driver_allocated_memory` / `recommended_max_memory`）
 - **GRPO 面板** — 奖励 ± 标准差置信带 + KL 散度图表
 - **DPO 面板** — 选中 vs 拒绝奖励 + KL 散度图表
 - **梯度范数与 tokens/sec** — 实时统计行，有数据时自动显示
 - **训练完成摘要横幅** — 训练结束时展示最终内存与运行时间统计
 - **终端 UI (Plotext)** — `scripts/terminal_dashboard.py` 支持 `--once` 一次性快照；DPO/GRPO 自动升级为 2×2 布局
-- **演示服务器** — `python scripts/demo_server.py --task grpo` 提供丰富的模拟数据，无需 GPU 即可预览所有面板
+- **演示服务器** — `python scripts/demo_server.py --task grpo --hardware mps|nvidia` 提供丰富的模拟数据，无需 GPU 即可预览所有面板
 
 同时支持 NVIDIA（通过 `GaslampDashboardCallback(task_type=...)`）和 Apple Silicon（通过 `MlxGaslampDashboard(task_type=...)`）。
 
@@ -212,6 +212,7 @@ Apple Silicon 用户如需更大的模型或 CUDA 专属功能，可将训练卸
 
 ## 更新日志
 
+- **2026-03-23** — 新增 Apple Silicon GRPO 模板（`scripts/mps_grpo_example.py`）：TRL GRPOTrainer + PEFT LoRA，基于 PyTorch MPS 运行，无需 Unsloth 或 vLLM，包含 5 个用于思维链数学推理的奖励函数。看板现在可在 Apple Silicon 上报告完整的内存分解（MPS `driver_allocated_memory` + `recommended_max_memory`）。`demo_server.py` 新增 `--hardware mps` 选项，提供符合 Apple Silicon 实际数据的预览值（1B float16，18 GB 统一内存）。
 - **2026-03-22** — 新增 `gaslamp.md` 可复现路书：每个项目现在都会记录所有已确定的决策及其原因，并附带 📖 ML 概念学习模块（方法、模型、数据、超参数、评估、导出），任何 Agent 或人员均可端到端复现项目并理解每个决策背后的原因。模板文件位于 `templates/gaslamp_template.md`，由 `init_project.py` 自动生成。
 - **2026-03-21** — 增强训练看板：任务感知面板（SFT/DPO/GRPO/Vision）、GPU 内存分解（基线 vs LoRA vs 总量）、GRPO 奖励 ± 标准差及 KL 散度图表、DPO 选中/拒绝奖励及 KL 图表、轮次追踪、训练完成摘要横幅、终端 DPO/GRPO 2×2 布局，以及新增 `scripts/demo_server.py` 无需 GPU 即可预览所有面板的模拟服务器。
 - **2026-03-19** — 新增终端训练看板（`scripts/terminal_dashboard.py`）：在终端中实时显示 `plotext` 损失和学习率图表，支持 `--once` 模式供 Claude Code 一次性检查训练进度。
