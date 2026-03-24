@@ -15,6 +15,7 @@
     "scripts/unsloth_sft_example.py",
     "scripts/unsloth_dpo_example.py",
     "scripts/unsloth_grpo_example.py",
+    "scripts/mps_grpo_example.py",
     "scripts/unsloth_vision_example.py",
     "scripts/unsloth_mlx_sft_example.py",
     "scripts/mlx_gaslamp_dashboard.py",
