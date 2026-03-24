@@ -1,6 +1,6 @@
 {
   "name": "unsloth-buddy",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Zero-friction LLM fine-tuning on NVIDIA (Unsloth) and Apple Silicon (mlx-tune). SFT, DPO, GRPO, vision — env setup to export, fully automated.",
   "contextFiles": [
     "SKILL.md",
