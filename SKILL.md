@@ -40,6 +40,7 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 | `scripts/unsloth_sft_example.py` | NVIDIA SFT training template — copy as `train.py` |
 | `scripts/unsloth_dpo_example.py` | NVIDIA DPO training template — copy as `train.py` |
 | `scripts/unsloth_grpo_example.py` | NVIDIA GRPO training template — copy as `train.py` |
+| `scripts/mps_grpo_example.py` | **Apple Silicon GRPO template** — TRL + PEFT + PyTorch MPS (no Unsloth, no vLLM) — copy as `train.py` |
 | `scripts/unsloth_vision_example.py` | NVIDIA vision/multimodal training template — copy as `train.py` |
 | `scripts/mlx_eval_template.py` | Apple Silicon eval template — copy as `eval.py` |
 | `scripts/demo_server.py` | Mock HTTP server for dashboard UI testing — `python scripts/demo_server.py --task sft\|dpo\|grpo\|vision --port 8080` |
@@ -232,12 +233,20 @@ Ask the user which path they prefer if the model is >8B or requires CUDA feature
 **If using Colab (Path A):** Phases A5–A7 above already cover training and monitoring. Skip to Phase 5 once `FINAL_CELL` returns successfully.
 
 **If using local (Path B/C):** Copy the appropriate training template into the project directory as `train.py`, then customise the top-level config variables — do NOT generate from scratch:
-- **Apple Silicon/mlx-tune**:
+- **Apple Silicon — SFT (mlx-tune)**:
   ```bash
   cp ./scripts/unsloth_mlx_sft_example.py train.py
   ```
   Edit the `CONFIG` block at the top of `train.py` (MODEL_NAME, DATASET_ID, ITERS, LEARNING_RATE, etc.).
   Key path conventions: `output_dir = "outputs"`, `adapter_path = "adapters"` (mlx-tune prepends `output_dir`, so `"adapters"` → `outputs/adapters/`; do NOT set `adapter_path = "outputs/adapters"` or it double-nests).
+- **Apple Silicon — GRPO (TRL + MPS, no mlx-tune)**:
+  mlx-tune supports SFT only. For GRPO with custom reward functions, use the MPS template instead:
+  ```bash
+  cp ./scripts/mps_grpo_example.py train.py
+  cp ./scripts/gaslamp_callback.py .
+  mkdir -p templates && cp ./templates/dashboard.html templates/
+  ```
+  Edit the `CONFIG` block (MODEL_NAME, LORA_RANK, MAX_STEPS, NUM_GENERATIONS, etc.) and replace `get_dataset()` and reward functions for your task. Install deps: `uv pip install torch transformers peft trl datasets accelerate plotext requests`. Do NOT set `use_vllm`, `load_in_4bit`, or `paged_adamw_8bit` — all are CUDA-only.
 - **NVIDIA/TRL**: Copy the matching example (`unsloth_sft_example.py`, `unsloth_dpo_example.py`, etc.) as `train.py`:
   ```bash
   cp ./scripts/unsloth_sft_example.py train.py   # adjust for DPO/GRPO/vision as needed
