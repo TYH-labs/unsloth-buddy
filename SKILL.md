@@ -4,7 +4,7 @@ description: This skill should be used when users want to fine-tune language mod
 license: Complete terms in LICENSE.txt
 metadata:
   author: gaslamp
-  version: "1.0.0"
+  version: "1.0.3"
   category: machine-learning
   repository: https://github.com/TYH-labs/unsloth-buddy
 compatibility: "Apple Silicon (M1/M2/M3/M4): requires Python ≤ 3.12 and mlx-tune (not CUDA). Linux/WSL with NVIDIA GPU: CUDA 11.8, 12.1, or 12.4+, Python 3.10+. Windows: conda env with Python 3.12. Not compatible with standard Unsloth on Apple Silicon."
@@ -43,7 +43,7 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 | `scripts/mps_grpo_example.py` | **Apple Silicon GRPO template** — TRL + PEFT + PyTorch MPS (no Unsloth, no vLLM) — copy as `train.py` |
 | `scripts/unsloth_vision_example.py` | NVIDIA vision/multimodal training template — copy as `train.py` |
 | `scripts/mlx_eval_template.py` | Apple Silicon eval template — copy as `eval.py` |
-| `scripts/demo_server.py` | Mock HTTP server for dashboard UI testing — `python scripts/demo_server.py --task sft\|dpo\|grpo\|vision --port 8080` |
+| `scripts/demo_server.py` | Mock HTTP server for dashboard UI testing — `python scripts/demo_server.py --task sft\|dpo\|grpo\|vision --hardware nvidia\|mps --port 8080` |
 | `templates/gaslamp_template.md` | Roadbook template — copied by `init_project.py` as `gaslamp.md` in each new project |
 | `templates/dashboard.html` | Web dashboard UI (copy into project's `templates/`) |
 | `templates/gaslamp.png` | Dashboard logo asset |

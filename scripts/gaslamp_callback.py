@@ -180,6 +180,9 @@ class GaslampDashboardCallback(TrainerCallback):
                     self._baseline_vram_mb = int(torch.cuda.max_memory_reserved() / (1024 * 1024))
                     props = torch.cuda.get_device_properties(0)
                     self._total_vram_mb = int(props.total_memory / (1024 * 1024))
+                elif torch.backends.mps.is_available():
+                    self._baseline_vram_mb = int(torch.mps.driver_allocated_memory() / (1024 * 1024))
+                    self._total_vram_mb = int(torch.mps.recommended_max_memory() / (1024 * 1024))
             except Exception:
                 pass
             _GLOBAL_PAYLOAD["phase"] = "training"
@@ -220,10 +223,15 @@ class GaslampDashboardCallback(TrainerCallback):
             # Final memory summary (mirrors unsloth-studio Colab cell 12)
             try:
                 import torch
+                peak_mb = lora_mb = total_mb = None
                 if torch.cuda.is_available():
-                    peak_mb   = int(torch.cuda.max_memory_reserved() / (1024 * 1024))
-                    lora_mb   = peak_mb - self._baseline_vram_mb
-                    total_mb  = self._total_vram_mb or 1
+                    peak_mb  = int(torch.cuda.max_memory_reserved() / (1024 * 1024))
+                    total_mb = self._total_vram_mb or 1
+                elif torch.backends.mps.is_available():
+                    peak_mb  = int(torch.mps.driver_allocated_memory() / (1024 * 1024))
+                    total_mb = self._total_vram_mb or 1
+                if peak_mb is not None:
+                    lora_mb = peak_mb - self._baseline_vram_mb
                     _GLOBAL_PAYLOAD.setdefault("hardware", {})
                     _GLOBAL_PAYLOAD["hardware"].update({
                         "peak_vram_mb":      peak_mb,
@@ -266,13 +274,19 @@ class GaslampDashboardCallback(TrainerCallback):
             # 2. Hyperparameters
             hp_info = {}
             try:
+                batch = getattr(args, "per_device_train_batch_size", None) \
+                     or getattr(args, "train_batch_size", 1)
                 hp_info = {
-                    "learning_rate": args.learning_rate,
-                    "train_batch_size": args.train_batch_size,
-                    "gradient_accumulation": args.gradient_accumulation_steps,
-                    "optimizer": getattr(args, "optim", "Unknown"),
-                    "seed": getattr(args, "seed", None),
+                    "learning_rate":               args.learning_rate,
+                    "per_device_train_batch_size": batch,
+                    "gradient_accumulation":       args.gradient_accumulation_steps,
+                    "optimizer":                   getattr(args, "optim", "Unknown"),
+                    "seed":                        getattr(args, "seed", None),
                 }
+                # GRPO: also surface generation_batch_size if present
+                gen_bs = getattr(args, "generation_batch_size", None)
+                if gen_bs is not None:
+                    hp_info["generation_batch_size"] = gen_bs
             except Exception:
                 pass
 
@@ -341,11 +355,14 @@ class GaslampDashboardCallback(TrainerCallback):
                 existing_logs.append(log_entry)
 
             # Live memory breakdown (unsloth-studio style)
-            hw_memory_extras = {}
             try:
                 import torch
+                peak_mb = None
                 if torch.cuda.is_available():
                     peak_mb  = int(torch.cuda.max_memory_reserved() / (1024 * 1024))
+                elif torch.backends.mps.is_available():
+                    peak_mb  = int(torch.mps.driver_allocated_memory() / (1024 * 1024))
+                if peak_mb is not None:
                     lora_mb  = peak_mb - self._baseline_vram_mb
                     total_mb = self._total_vram_mb or 1
                     hw_info.update({
