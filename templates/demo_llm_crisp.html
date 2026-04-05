@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{LANG}}">
 
 <head>
     <meta charset="UTF-8">
@@ -368,26 +368,26 @@
 <body>
     <div class="container">
         <header>
-            <div class="header-badge">Fine-tuning Demo</div>
+            <div class="header-badge">{{UI_BADGE}}</div>
             <h1>{{MODEL_NAME}}</h1>
             <p>{{MODEL_DESCRIPTION}}</p>
         </header>
 
         <main>
             <div class="card selector-section">
-                <label for="example-selector">Select a Prompt</label>
+                <label for="example-selector">{{UI_SELECT_PROMPT}}</label>
                 <select id="example-selector" class="dropdown">
                     <!-- Options injected by JS -->
                 </select>
             </div>
 
             <div class="card prompt-section">
-                <h2>Prompt</h2>
+                <h2>{{UI_PROMPT}}</h2>
                 <textarea id="prompt-input" readonly>Loading...</textarea>
             </div>
 
             <div class="card">
-                <h2>Model Outputs</h2>
+                <h2>{{UI_MODEL_OUTPUTS}}</h2>
                 <div class="comparison-grid">
                     <div class="output-pane base-pane">
                         <div class="pane-label base">
@@ -408,7 +408,7 @@
             </div>
 
             <div class="metrics-section">
-                <h3>Training Details</h3>
+                <h3>{{UI_TRAINING_DETAILS}}</h3>
                 <ul id="metrics-list">
                     <!-- {{INJECT_METRICS}} -->
                 </ul>
@@ -440,9 +440,9 @@
         const FT_MODEL_NAME   = "{{FINETUNED_MODEL_NAME}}";
 
         const QUALITY_LABELS = {
-            positive: "✦ Improved",
-            neutral:  "≈ Comparable",
-            negative: "↓ Regression"
+            positive: "{{UI_QUALITY_POSITIVE}}",
+            neutral:  "{{UI_QUALITY_NEUTRAL}}",
+            negative: "{{UI_QUALITY_NEGATIVE}}"
         };
 
         // ── DOM REFS ──────────────────────────────────────────────────────────

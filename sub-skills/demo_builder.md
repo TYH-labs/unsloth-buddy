@@ -63,12 +63,33 @@ Do NOT base the decision on training method (SFT/DPO/GRPO).
 
 **No purple.** If the domain is ambiguous, default to `crisp-light` with blue.
 
-### 3b. State your choice and invite override
+### 3b. Detect language and confirm
 
-Tell the user:
-> "For a **[domain]** model, I'll use the **[crisp-light / dark-signal]** theme with **[color]** accent — feels [trustworthy / bold / technical]. Want a different color or theme?"
+Detect the language of the current conversation. Then ask the user in a single confirmation message that covers both theme and language:
+
+> "For a **[domain]** model, I'll use the **[crisp-light / dark-signal]** theme with **[color]** accent — feels [trustworthy / bold / technical]. The demo UI will be in **[detected language]** to match our conversation. Want a different color, theme, or language?"
+
+If the user has been conversing in a non-English language (e.g. Chinese, Japanese, Spanish), default to that language for all UI strings. If the conversation is mixed or unclear, default to English.
 
 Wait for their confirmation before generating.
+
+### 3c. Build UI strings for the chosen language
+
+Use the table below for the target language. For languages not listed, translate from the English column — keep strings short and natural.
+
+| Placeholder | English (default) | 简体中文 | 繁體中文 | 日本語 |
+|---|---|---|---|---|
+| `{{LANG}}` | `en` | `zh-Hans` | `zh-Hant` | `ja` |
+| `{{UI_BADGE}}` | Fine-tuning Demo | 微调演示 | 微調展示 | ファインチューニング デモ |
+| `{{UI_SELECT_PROMPT}}` | Select a Prompt | 选择提示词 | 選擇提示詞 | プロンプトを選択 |
+| `{{UI_PROMPT}}` | Prompt | 提示词 | 提示詞 | プロンプト |
+| `{{UI_MODEL_OUTPUTS}}` | Model Outputs | 模型输出 | 模型輸出 | モデル出力 |
+| `{{UI_TRAINING_DETAILS}}` | Training Details | 训练详情 | 訓練詳情 | 学習の詳細 |
+| `{{UI_QUALITY_POSITIVE}}` | ✦ Improved | ✦ 改善 | ✦ 改善 | ✦ 改善 |
+| `{{UI_QUALITY_NEUTRAL}}` | ≈ Comparable | ≈ 相当 | ≈ 相當 | ≈ 同等 |
+| `{{UI_QUALITY_NEGATIVE}}` | ↓ Regression | ↓ 回退 | ↓ 回退 | ↓ 低下 |
+
+The `{{MODEL_NAME}}`, `{{MODEL_DESCRIPTION}}`, metric labels, and example outputs should also be written in the target language when it differs from English. The footer is always English — do not translate it.
 
 ---
 
@@ -107,13 +128,22 @@ Read the chosen template from `templates/demo_llm_crisp.html` (or `demo_llm_dark
 
 | Placeholder | Value |
 |---|---|
+| `{{LANG}}` | BCP 47 language tag, e.g. `en`, `zh-Hans`, `zh-Hant`, `ja` |
 | `{{MODEL_NAME}}` | Short display name, e.g. `"Qwen2.5-0.5B · Chip2 SFT"` |
-| `{{MODEL_DESCRIPTION}}` | One-line description, e.g. `"Instruction-following model fine-tuned on OpenHermes chip2 dataset."` |
+| `{{MODEL_DESCRIPTION}}` | One-line description (in target language) |
 | `{{BASE_MODEL_NAME}}` | e.g. `"Qwen2.5-0.5B-Instruct (base)"` |
 | `{{FINETUNED_MODEL_NAME}}` | e.g. `"Qwen2.5-0.5B + chip2-sft LoRA"` |
 | `{{INJECT_EXAMPLES_JSON}}` | Replace with `const examples = [ ... ];` — the hardcoded JSON array |
 | `{{INJECT_METRICS}}` | Replace with `<li>` chips (see format below) |
 | `{{INJECT_ACCENT_OVERRIDE}}` | Replace with the CSS accent block from Step 4 |
+| `{{UI_BADGE}}` | Header badge text — from Step 3c language table |
+| `{{UI_SELECT_PROMPT}}` | Dropdown label — from Step 3c language table |
+| `{{UI_PROMPT}}` | Prompt section heading — from Step 3c language table |
+| `{{UI_MODEL_OUTPUTS}}` | Outputs section heading — from Step 3c language table |
+| `{{UI_TRAINING_DETAILS}}` | Metrics section heading — from Step 3c language table |
+| `{{UI_QUALITY_POSITIVE}}` | Quality badge: improved — from Step 3c language table |
+| `{{UI_QUALITY_NEUTRAL}}` | Quality badge: comparable — from Step 3c language table |
+| `{{UI_QUALITY_NEGATIVE}}` | Quality badge: regression — from Step 3c language table |
 
 ### Examples JSON format
 
@@ -194,8 +224,8 @@ Then update `gaslamp.md` **§ 9 File Inventory** with:
 
 - [ ] `gaslamp.md` read and fields extracted
 - [ ] 4–6 example pairs precomputed from `eval.py --compare`
-- [ ] Domain inferred → theme + accent selected → user confirmed
+- [ ] Domain inferred → theme + accent selected → language confirmed → user approved
 - [ ] Accent CSS override built
-- [ ] All 7 placeholders substituted (no `{{...}}` strings remaining in final file)
+- [ ] All placeholders substituted (no `{{...}}` strings remaining in final file)
 - [ ] File written to `demos/<project-name>/index.html`
 - [ ] `gaslamp.md` § 9 updated
