@@ -14,7 +14,8 @@
       "skills": "./SKILL.md",
       "sub-skills": [
         "./sub-skills/interview.md",
-        "./sub-skills/data.md"
+        "./sub-skills/data.md",
+        "./sub-skills/demo_builder.md"
       ],
       "scripts": [
         "./scripts/init_project.py",
@@ -37,7 +38,9 @@
       "templates": [
         "./templates/gaslamp_template.md",
         "./templates/dashboard.html",
-        "./templates/gaslamp.png"
+        "./templates/gaslamp.png",
+        "./templates/demo_llm_crisp.html",
+        "./templates/demo_llm_dark.html"
       ],
       "agents": [
         "./AGENTS.md"

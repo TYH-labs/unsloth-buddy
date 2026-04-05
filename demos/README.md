@@ -12,9 +12,9 @@ Every example is a single file. Hand it to any agent running [unsloth-buddy](htt
 
 ## Gallery
 
-| Example | Method | Model | Dataset | Hardware | What you get |
-|---------|--------|-------|---------|----------|--------------|
-| [qwen2.5-0.5b-chip2-sft](./qwen2.5-0.5b-chip2-sft/gaslamp.md) | SFT | Qwen2.5-0.5B-Instruct | OIG unified_chip2 (200k turns) | Apple Silicon | Compact instruction-following model, ~3 min on M-series Mac |
+| Example | Method | Model | Dataset | Hardware | What you get | Demo |
+|---------|--------|-------|---------|----------|--------------|------|
+| [qwen2.5-0.5b-chip2-sft](./qwen2.5-0.5b-chip2-sft/gaslamp.md) | SFT | Qwen2.5-0.5B-Instruct | OIG unified_chip2 (200k turns) | Apple Silicon | Compact instruction-following model, ~3 min on M-series Mac | [demo](./qwen2.5-0.5b-chip2-sft/index.html) |
 
 ---
 

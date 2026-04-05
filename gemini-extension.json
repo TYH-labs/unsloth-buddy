@@ -7,6 +7,7 @@
     "AGENTS.md",
     "sub-skills/interview.md",
     "sub-skills/data.md",
+    "sub-skills/demo_builder.md",
     "scripts/init_project.py",
     "scripts/detect_system.py",
     "scripts/detect_env.py",
@@ -25,7 +26,9 @@
     "scripts/setup_colab.py",
     "templates/gaslamp_template.md",
     "templates/dashboard.html",
-    "templates/gaslamp.png"
+    "templates/gaslamp.png",
+    "templates/demo_llm_crisp.html",
+    "templates/demo_llm_dark.html"
   ],
   "schemaVersion": "1.0"
 }
