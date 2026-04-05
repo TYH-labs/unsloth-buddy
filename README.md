@@ -139,7 +139,7 @@ customer_faq_sft_2026_03_17/
 |---|---|---|
 | NVIDIA T4 (16 GB) | `unsloth` | 7B QLoRA, small-scale GRPO |
 | NVIDIA A100 (80 GB) | `unsloth` | 70B QLoRA, 14B LoRA 16-bit |
-| Apple M1 / M2 / M3 / M4 | `mlx-tune` | 7B on 10 GB unified memory, 13B on 24 GB |
+| Apple M1 / M2 / M3 / M4 | `mlx-tune` / `trl` | SFT/DPO: 7B on 10 GB, 13B on 24 GB; GRPO: 1–7B via TRL + PyTorch MPS |
 | Google Colab (T4/L4/A100) | `unsloth` via `colab-mcp` | Free cloud GPU, opt-in |
 
 Unsloth is ~2× faster than standard HuggingFace training, uses up to 80% less VRAM, and produces exact gradients.
@@ -157,13 +157,13 @@ Every local training run automatically opens a real-time dashboard at **http://l
 - **EMA smoothed loss** — clear trend line over noisy raw loss, plus running average
 - **Dynamic phase badge** — idle → training → completed / error, with colour-coded task-type badge
 - **ETA, elapsed time & epoch** — estimated time remaining and current epoch progress
-- **GPU memory breakdown** — baseline (model load) vs LoRA training overhead vs total, shown as gauge bars (mirrors unsloth-studio Colab output)
+- **GPU memory breakdown** — baseline (model load) vs LoRA training overhead vs total, shown as gauge bars; works on both NVIDIA (CUDA) and Apple Silicon (MPS via `driver_allocated_memory` / `recommended_max_memory`)
 - **GRPO panels** — reward ± std-dev confidence band + KL divergence chart
 - **DPO panels** — chosen vs rejected reward + KL divergence chart
 - **Gradient norm & tokens/sec** — live stats row, fades in when data arrives
 - **Completed summary banner** — final memory and runtime stats on training end
 - **Terminal UI (Plotext)** — `scripts/terminal_dashboard.py` with `--once` for CLI snapshots; upgrades to 2×2 layout for DPO/GRPO
-- **Demo server** — `python scripts/demo_server.py --task grpo` serves rich mock data so you can preview every panel without a GPU
+- **Demo server** — `python scripts/demo_server.py --task grpo --hardware mps|nvidia` serves rich mock data so you can preview every panel without a GPU
 
 Works on both NVIDIA (via `GaslampDashboardCallback(task_type=...)`) and Apple Silicon (via `MlxGaslampDashboard(task_type=...)`).
 

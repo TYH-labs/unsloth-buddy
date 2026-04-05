@@ -139,7 +139,7 @@ customer_faq_sft_2026_03_17/
 |---|---|---|
 | NVIDIA T4 (16 GB) | `unsloth` | 7B QLoRA，小规模 GRPO |
 | NVIDIA A100 (80 GB) | `unsloth` | 70B QLoRA，14B LoRA 16-bit |
-| Apple M1 / M2 / M3 / M4 | `mlx-tune` | 10 GB 统一内存跑 7B，24 GB 跑 13B |
+| Apple M1 / M2 / M3 / M4 | `mlx-tune` / `trl` | SFT/DPO：10 GB 跑 7B，24 GB 跑 13B；GRPO：1–7B（TRL + PyTorch MPS）|
 | Google Colab (T4/L4/A100) | `unsloth` 通过 `colab-mcp` | 免费云端 GPU，可选接入 |
 
 Unsloth 相比标准 HuggingFace 训练速度快约 2 倍，VRAM 使用量减少高达 80%，且使用精确梯度。
@@ -157,13 +157,13 @@ Unsloth 相比标准 HuggingFace 训练速度快约 2 倍，VRAM 使用量减少
 - **EMA 平滑损失** — 清晰的趋势线覆盖嘈杂的原始损失，附带运行均值
 - **动态阶段徽章** — 空闲 → 训练中 → 已完成 / 错误，含色彩标识的任务类型徽章
 - **ETA、已用时间与轮次** — 剩余时间估算及当前 epoch 进度
-- **GPU 内存分解** — 基线（模型加载）vs LoRA 训练开销 vs 总量，以仪表条形式展示（与 unsloth-studio Colab 输出一致）
+- **GPU 内存分解** — 基线（模型加载）vs LoRA 训练开销 vs 总量，以仪表条形式展示；同时支持 NVIDIA（CUDA）和 Apple Silicon（MPS，使用 `driver_allocated_memory` / `recommended_max_memory`）
 - **GRPO 面板** — 奖励 ± 标准差置信带 + KL 散度图表
 - **DPO 面板** — 选中 vs 拒绝奖励 + KL 散度图表
 - **梯度范数与 tokens/sec** — 实时统计行，有数据时自动显示
 - **训练完成摘要横幅** — 训练结束时展示最终内存与运行时间统计
 - **终端 UI (Plotext)** — `scripts/terminal_dashboard.py` 支持 `--once` 一次性快照；DPO/GRPO 自动升级为 2×2 布局
-- **演示服务器** — `python scripts/demo_server.py --task grpo` 提供丰富的模拟数据，无需 GPU 即可预览所有面板
+- **演示服务器** — `python scripts/demo_server.py --task grpo --hardware mps|nvidia` 提供丰富的模拟数据，无需 GPU 即可预览所有面板
 
 同时支持 NVIDIA（通过 `GaslampDashboardCallback(task_type=...)`）和 Apple Silicon（通过 `MlxGaslampDashboard(task_type=...)`）。
 
