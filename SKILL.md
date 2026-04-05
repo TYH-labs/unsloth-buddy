@@ -46,6 +46,8 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 | `templates/gaslamp_template.md` | Roadbook template — copied by `init_project.py` as `gaslamp.md` in each new project |
 | `templates/dashboard.html` | Web dashboard UI (copy into project's `templates/`) |
 | `templates/gaslamp.png` | Dashboard logo asset |
+| `templates/demo_llm_crisp.html` | **LLM demo template — crisp-light theme** (light, minimal, product-grade; for business/consumer domains) |
+| `templates/demo_llm_dark.html` | **LLM demo template — dark-signal theme** (bold, high-contrast, monospace output; for technical/developer domains) |
 
 ## The 7-Phase End-to-End Lifecycle
 
@@ -298,9 +300,13 @@ Copy the eval template into the project and configure it:
 cp ./scripts/mlx_eval_template.py eval.py   # Apple Silicon
 # or: cp ./scripts/eval_template.py eval.py  # Linux/CUDA
 ```
-Edit the top-level config vars (MODEL_NAME, ADAPTER_PATH, STYLE) to match training, then run:
+Edit the top-level config vars (MODEL_NAME, ADAPTER_PATH, STYLE) to match training, then run **both modes** in sequence:
 ```bash
+# 1. Standard batch eval
 python eval.py 2>&1 | tee logs/eval.log
+
+# 2. Side-by-side compare (required for demo generation in Phase 5.5)
+python eval.py --compare 2>&1 | tee logs/eval_compare.log
 ```
 
 **Critical — Apple Silicon / mlx-tune:** `ADAPTER_PATH` in `eval.py` must be the full relative path to the adapters directory (e.g. `"outputs/adapters"`). Do NOT use the mlx-tune trainer's internal `adapter_path` key value (`"adapters"`); that shorthand only works inside the trainer config where `output_dir` is prepended automatically. `FastLanguageModel.from_pretrained(adapter_path=...)` expects the actual path.
@@ -308,6 +314,26 @@ python eval.py 2>&1 | tee logs/eval.log
 Record the qualitative results in `memory.md`.
 
 **→ After Phase 5: update `gaslamp.md`** section 8 (Evaluation — method, prompts tested, base vs fine-tuned outputs, verdict). Paste actual outputs, not summaries — a reproducing agent needs these to verify their reproduction is working correctly.
+
+### Phase 5.5: Demo Generation
+
+After Phase 5 is complete, read `user domain / audience` from `project_brief.md`, then ask the user:
+
+> *"Eval is done. Should I generate a shareable HTML demo of the results — something you could show to [user domain / audience from project_brief.md]? It runs in any browser, no server needed."*
+
+For example: *"…something you could show to your customer support team?"* or *"…something you could share with the engineering org?"*
+
+If yes (or no explicit objection), read `sub-skills/demo_builder.md` and proceed.
+The `--compare` outputs from Phase 5 are the input — no new model runs needed.
+
+Quick summary of what the sub-skill does:
+1. Reads `gaslamp.md` to extract model name, base model, metrics
+2. Uses the `--compare` outputs from `logs/eval_compare.log` as example pairs
+3. Picks template + accent based on **user domain** (from `project_brief.md` — captured in Phase 1)
+4. Fills all placeholders and writes `demos/<project-name>/index.html`
+5. No server needed — open the file directly in any browser
+
+**→ After Phase 5.5: update `gaslamp.md`** § 9 File Inventory with the generated `index.html`.
 
 ### Phase 6: Export & Conversion
 

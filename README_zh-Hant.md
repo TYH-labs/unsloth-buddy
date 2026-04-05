@@ -62,7 +62,7 @@
            執行：ollama create my-faq-bot -f Modelfile && ollama run my-faq-bot
 ```
 
-一次對話，七個階段，最終得到一個可部署的模型。
+一次對話，七個階段，最終得到一個可部署的模型 — 以及一個可分享的展示頁面。
 
 ---
 
@@ -95,7 +95,7 @@ git clone https://github.com/TYH-labs/unsloth-buddy.git .agents/skills/unsloth-b
 
 | 你的顧慮 | 實際發生的事 |
 |---|---|
-| **「我不知道從哪裡開始」** | 5 點訪談鎖定方法、模型、資料、硬體和部署目標，然後再撰寫任何程式碼 |
+| **「我不知道從哪裡開始」** | 2 個問題的訪談鎖定任務、受眾和資料，然後推薦合適的模型、硬體和方法 |
 | **「我沒有資料，或者格式不對」** | 專門的資料階段負責取得、生成或重新格式化資料，精確符合訓練器所需的 schema |
 | **「SFT？DPO？GRPO？選哪個？」** | 將你的目標對應到正確的技術，並用淺顯易懂的語言解釋原因 |
 | **「選哪個模型？能裝進我的 GPU 嗎？」** | 偵測你的硬體，對應到可用的模型大小，必要時估算雲端成本 |
@@ -113,11 +113,12 @@ git clone https://github.com/TYH-labs/unsloth-buddy.git .agents/skills/unsloth-b
 | 階段 | 發生的事 | 產出檔案 |
 |---|---|---|
 | **0. 初始化** | 建立 `{name}_{date}/` 標準目錄結構 | `gaslamp.md`、`progress_log.md` |
-| **1. 訪談** | 5 點 Unsloth 合約 — 方法、模型、資料、硬體、部署 | `project_brief.md` |
+| **1. 訪談** | 2 個問題的訪談 — 任務 + 資料；擷取領域/受眾 | `project_brief.md` |
 | **2. 資料** | 取得、驗證並格式化為訓練器 schema | `data_strategy.md` |
 | **3. 環境** | 硬體掃描 → Python 環境檢查 → 阻塞直到就緒 | `detect_env_result.json` |
 | **4. 訓練** | 生成並執行 `train.py`，串流輸出至日誌 | `outputs/adapters/` |
 | **5. 評估** | 批量測試、互動式 REPL、基礎模型對比微調模型 | `logs/eval.log` |
+| **5.5. 展示** | 產生可分享的靜態 HTML 頁面 — 基礎模型 vs 微調模型並排展示 | `demos/<name>/index.html` |
 | **6. 匯出** | GGUF、合併 16-bit 或 Hub 推送 | `outputs/` |
 
 ```
@@ -168,6 +169,23 @@ Unsloth 相比標準 HuggingFace 訓練速度快約 2 倍，VRAM 使用量減少
 
 ---
 
+## 展示生成器
+
+評估完成後，Agent 可以產生一個**靜態 HTML 展示頁面**，並排展示基礎模型與微調模型的輸出 — 在任意瀏覽器中開啟即可，無需伺服器。非常適合與團隊成員、利害關係人分享成果，或放入作品集。
+
+展示生成器是 [Gaslamp](https://gaslamp.dev/) 平台展示工具的一部分。我們為 unsloth-buddy 做了簡化，內建兩套主題並支援基於領域的自動配色：
+
+| 主題 | 適用場景 | 風格 |
+|---|---|---|
+| **crisp-light** | 商務、醫療、教育、通用 | 簡潔、極簡、淺色背景 |
+| **dark-signal** | 程式碼、數學、安全、DevOps | 大膽、高對比度、等寬輸出 |
+
+強調色根據模型領域自動選取（如醫療用青色、教育用琥珀色、程式碼用電光青）— 也可自行指定。
+
+**檢視線上範例：** [`demos/qwen2.5-0.5b-chip2-sft/index.html`](demos/qwen2.5-0.5b-chip2-sft/index.html) — 下載後在任意瀏覽器中開啟。
+
+---
+
 ## Google Colab 雲端訓練
 
 Apple Silicon 使用者如需更大的模型或 CUDA 專屬功能，可將訓練卸載到免費 Colab GPU：
@@ -212,6 +230,7 @@ Apple Silicon 使用者如需更大的模型或 CUDA 專屬功能，可將訓練
 
 ## 更新日誌
 
+- **2026-04-04** — 新增展示生成器（第 5.5 階段）：評估完成後產生靜態 HTML 展示頁面，並排展示基礎模型與微調模型輸出。內建兩套主題（crisp-light、dark-signal），支援基於領域的自動強調色。無需伺服器 — 在任意瀏覽器中直接開啟。屬於 [Gaslamp](https://gaslamp.dev/) 展示工具的簡化版本。訪談從 5 點合約簡化為 2 個問題（任務 + 資料），同時擷取使用者領域/受眾以用於展示主題選擇。
 - **2026-03-22** — 新增 `gaslamp.md` 可復現路書：每個專案現在都會記錄所有已確定的決策及其原因，並附帶 📖 ML 概念學習模組（方法、模型、資料、超參數、評估、匯出），任何 Agent 或人員均可端到端復現專案並理解每個決策背後的原因。範本檔案位於 `templates/gaslamp_template.md`，由 `init_project.py` 自動產生。
 - **2026-03-21** — 增強訓練儀表板：任務感知面板（SFT/DPO/GRPO/Vision）、GPU 記憶體分解（基線 vs LoRA vs 總量）、GRPO 獎勵 ± 標準差及 KL 散度圖表、DPO 選取/拒絕獎勵及 KL 圖表、輪次追蹤、訓練完成摘要橫幅、終端 DPO/GRPO 2×2 配置，以及新增 `scripts/demo_server.py` 無需 GPU 即可預覽所有面板的模擬伺服器。
 - **2026-03-19** — 新增終端訓練儀表板（`scripts/terminal_dashboard.py`）：在終端中即時顯示 `plotext` 損失與學習率圖表，支援 `--once` 模式供 Claude Code 一次性檢視訓練進度。

@@ -9,8 +9,9 @@
 Instead of interrogating the user with a long list of questions, simply ask these two fundamental things:
 
 ### A. The Task Definition
-- "What exactly are we trying to teach the model to do?"
-- Based on their answer, map it to a TRL method internally:
+- "What exactly are we trying to teach the model to do, and who will use it?"
+- The second part ("who will use it") captures the **domain/audience** — critical for demo theme selection later. Common answers: customer support, internal tooling, healthcare, finance, education, code generation, research.
+- Based on the task, map it to a TRL method internally:
     - Standard instruction following → **SFT**
     - Analyzing images/video → **Vision SFT**
     - Aligning with human preference (better/worse pairs) → **DPO / ORPO**
@@ -61,5 +62,12 @@ Use this only if the user is doing complex math/coding tasks (GRPO) or specifica
 ## 3. Output
 
 **Mandatory Deliverable**: `project_brief.md` (saved in the project specific folder).
+
+Must include these fields (add any others that are confirmed):
+- Problem definition (what the model should do)
+- **User domain / audience** (e.g. "customer support chatbot", "coding assistant for engineers") — used by the demo builder in Phase 5.5
+- Chosen base model
+- Target hardware
+- Training method
 
 Only when the user confirms the Brief, transition to **Phase 2: Data Strategy**.

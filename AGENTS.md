@@ -23,25 +23,29 @@ Read `SKILL.md` — it defines the full 7-phase lifecycle. Then read `sub-skills
 
 ```
 SKILL.md                       ← main orchestration logic
-sub-skills/interview.md        ← Phase 1: 5-point requirements interview
+sub-skills/interview.md        ← Phase 1: 2-question requirements interview
 sub-skills/data.md             ← Phase 2: data acquisition and formatting
+sub-skills/demo_builder.md     ← Phase 5.5: static HTML demo generation
 scripts/detect_system.py       ← Phase 3: hardware detection (Stage 1)
 scripts/detect_env.py          ← Phase 3: env/package detection (Stage 2)
 scripts/init_project.py        ← Phase 0: create dated project directory + gaslamp.md
 scripts/demo_server.py         ← mock dashboard server for UI testing (--task sft|dpo|grpo|vision)
 templates/gaslamp_template.md  ← roadbook template (copied as gaslamp.md into each project)
+templates/demo_llm_crisp.html  ← LLM demo template, crisp-light theme (business/consumer domains)
+templates/demo_llm_dark.html   ← LLM demo template, dark-signal theme (technical/developer domains)
 ```
 
-## Lifecycle (7 Phases)
+## Lifecycle (7 Phases + Demo)
 
 | Phase | What you do |
 |-------|-------------|
 | 0. Init | Run `python scripts/init_project.py <name>` → creates `{name}_{date}/` with `gaslamp.md` roadbook |
-| 1. Interview | Ask the 5-point Unsloth Contract questions (method, model, data, hardware, deploy) |
+| 1. Interview | Ask the 2-question interview (task + data); capture **user domain/audience** in `project_brief.md` |
 | 2. Data | Acquire, validate, and reformat the dataset to the required schema |
 | 3. Env | Run detect_system.py then detect_env.py — block until READY |
 | 4. Train | Generate and run `train.py` inside the project directory |
-| 5. Eval | Run eval against base and fine-tuned model, show comparison |
+| 5. Eval | Run eval against base and fine-tuned model — both batch and `--compare` mode |
+| 5.5. Demo | Ask user if they want a shareable demo; read `sub-skills/demo_builder.md`; write `demos/<name>/index.html` |
 | 6. Export | Convert to GGUF / merge / push to HF Hub per user's deploy target |
 
 Everything is scoped to the dated project directory. Nothing touches the repo root.
