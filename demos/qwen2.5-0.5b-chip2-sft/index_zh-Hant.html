@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen2.5-0.5B · Chip2 SFT — 微調展示</title>
+    <meta name="description" content="基於 OIG unified_chip2 資料集微調的指令跟隨模型。並排對比基礎模型與微調模型的輸出。">
+    <!-- style: crisp-light | vibe: clean, minimal, premium -->
+    <!-- fonts: DM Sans (body) + Instrument Serif (display) via Google Fonts -->
+<style>
+    /* === FONT IMPORT === */
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap');
+
+    /* === DESIGN TOKENS (crisp-light base) === */
+    :root {
+        --bg-gradient: linear-gradient(145deg, #e8edf3 0%, #f4f6f9 60%, #eef1f6 100%);
+        --card-bg: rgba(255, 255, 255, 0.72);
+        --card-border: rgba(255, 255, 255, 0.9);
+        --text-main: #111827;
+        --text-secondary: #6b7280;
+        --text-muted: #9ca3af;
+        --accent: #0052cc;
+        --accent-light: rgba(0, 82, 204, 0.08);
+        --accent-mid: rgba(0, 82, 204, 0.18);
+        --border-color: rgba(0, 0, 0, 0.06);
+        --border-radius: 20px;
+        --border-radius-sm: 12px;
+        --blur: blur(24px);
+        --shadow-card: 0 4px 32px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+        --shadow-card-hover: 0 8px 48px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06);
+
+        /* Clamp-based typography */
+        --font-display: 'Instrument Serif', Georgia, serif;
+        --font-body: 'DM Sans', system-ui, sans-serif;
+        --size-h1: clamp(1.75rem, 4vw + 0.5rem, 2.75rem);
+        --size-h2: clamp(1.0rem, 1.8vw + 0.2rem, 1.25rem);
+        --size-h3: clamp(0.7rem, 0.9vw + 0.05rem, 0.8125rem);
+        --size-body: clamp(0.875rem, 1.2vw + 0.1rem, 1rem);
+        --size-small: clamp(0.75rem, 0.9vw, 0.875rem);
+        --size-badge: clamp(0.75rem, 1.0vw, 0.875rem);
+
+        --gap-card: clamp(1rem, 3vw, 1.5rem);
+        --pad-card: clamp(1.25rem, 3vw, 1.875rem);
+        --pad-page: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 4vw, 1.5rem);
+    }
+
+    /* === BASE === */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: var(--font-body);
+        font-size: var(--size-body);
+        background: var(--bg-gradient);
+        background-attachment: fixed;
+        color: var(--text-main);
+        padding: var(--pad-page);
+        display: flex;
+        justify-content: center;
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .container { max-width: 900px; width: 100%; }
+
+    /* === HEADER === */
+    header {
+        text-align: center;
+        margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+        padding-bottom: clamp(1rem, 2vw, 1.5rem);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .header-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4em;
+        padding: 0.25em 0.75em;
+        border-radius: 100px;
+        background: var(--accent-light);
+        color: var(--accent);
+        font-size: var(--size-small);
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 0.9rem;
+    }
+
+    h1 {
+        font-family: var(--font-display);
+        font-size: var(--size-h1);
+        font-weight: 400;
+        letter-spacing: -0.01em;
+        line-height: 1.15;
+        color: var(--text-main);
+        margin-bottom: 0.4em;
+    }
+
+    header p {
+        color: var(--text-secondary);
+        font-size: var(--size-body);
+        line-height: 1.5;
+        font-weight: 400;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* === CARD === */
+    .card {
+        background: var(--card-bg);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        border-radius: var(--border-radius);
+        padding: var(--pad-card);
+        margin-bottom: var(--gap-card);
+        box-shadow: var(--shadow-card);
+        border: 1px solid var(--card-border);
+        transition: box-shadow 0.25s ease, transform 0.2s ease;
+
+        opacity: 0;
+        transform: translateY(18px);
+        animation: fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .card:hover {
+        box-shadow: var(--shadow-card-hover);
+        transform: translateY(-2px);
+    }
+
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.12s; }
+    .card:nth-child(3) { animation-delay: 0.19s; }
+    .card:nth-child(4) { animation-delay: 0.26s; }
+
+    @keyframes fadeSlideUp {
+        from { opacity: 0; transform: translateY(18px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .card { animation: none; opacity: 1; transform: none; }
+    }
+
+    h2 {
+        font-family: var(--font-body);
+        font-size: var(--size-h2);
+        font-weight: 600;
+        margin-bottom: 0.8em;
+        color: var(--text-main);
+        letter-spacing: -0.01em;
+    }
+
+    /* === SELECTOR === */
+    .selector-section { display: flex; flex-direction: column; gap: 0.6rem; }
+
+    .selector-section label {
+        font-size: var(--size-small);
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .dropdown {
+        width: 100%;
+        padding: 0.7rem 1rem;
+        font-size: var(--size-body);
+        font-family: var(--font-body);
+        border-radius: var(--border-radius-sm);
+        border: 1.5px solid var(--border-color);
+        background-color: rgba(255, 255, 255, 0.9);
+        color: var(--text-main);
+        cursor: pointer;
+        outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 1rem center;
+        padding-right: 2.5rem;
+    }
+
+    .dropdown:hover { border-color: var(--accent); }
+    .dropdown:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-mid); outline: none; }
+
+    /* === PROMPT INPUT === */
+    .prompt-section textarea {
+        width: 100%;
+        min-height: 72px;
+        border: 1.5px solid var(--border-color);
+        border-radius: var(--border-radius-sm);
+        padding: 0.875rem 1rem;
+        font-size: var(--size-body);
+        font-family: var(--font-body);
+        background: rgba(255, 255, 255, 0.9);
+        color: var(--text-main);
+        resize: none;
+        line-height: 1.55;
+        transition: border-color 0.2s ease;
+    }
+
+    /* === COMPARISON GRID === */
+    .comparison-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: clamp(0.75rem, 2vw, 1.25rem);
+        margin-top: 0.25rem;
+    }
+
+    @media (max-width: 600px) {
+        .comparison-grid { grid-template-columns: 1fr; }
+    }
+
+    .output-pane { display: flex; flex-direction: column; gap: 0.5rem; }
+
+    .pane-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5em;
+        font-size: var(--size-small);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--text-secondary);
+    }
+
+    .pane-label .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .pane-label.base .dot { background: var(--text-muted); }
+    .pane-label.ft .dot   { background: var(--accent); }
+    .pane-label.ft        { color: var(--accent); }
+
+    .output-text {
+        width: 100%;
+        min-height: 150px;
+        border: 1.5px solid var(--border-color);
+        border-radius: var(--border-radius-sm);
+        padding: 0.875rem 1rem;
+        font-size: var(--size-body);
+        font-family: var(--font-body);
+        background: rgba(255, 255, 255, 0.85);
+        color: var(--text-main);
+        resize: none;
+        line-height: 1.6;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .ft-pane .output-text.positive {
+        border-left: 3px solid #059669;
+        background: rgba(5, 150, 105, 0.03);
+    }
+    .ft-pane .output-text.neutral {
+        border-left: 3px solid var(--accent);
+        background: rgba(0, 82, 204, 0.02);
+    }
+    .ft-pane .output-text.negative {
+        border-left: 3px solid #dc2626;
+        background: rgba(220, 38, 38, 0.03);
+    }
+
+    /* === QUALITY BADGE === */
+    .quality-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35em;
+        padding: 0.2em 0.65em;
+        border-radius: 100px;
+        font-size: var(--size-badge);
+        font-weight: 600;
+        margin-top: 0.35rem;
+        align-self: flex-start;
+    }
+
+    .quality-badge::before {
+        content: '';
+        display: block;
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: 0.8;
+    }
+
+    .quality-badge.positive { background: #ecfdf5; color: #065f46; }
+    .quality-badge.neutral  { background: #f3f4f6; color: #374151; }
+    .quality-badge.negative { background: #fef2f2; color: #991b1b; }
+
+    /* === METRICS STRIP === */
+    .metrics-section {
+        margin-top: clamp(1.5rem, 4vw, 2.5rem);
+        border-top: 1px solid var(--border-color);
+        padding-top: clamp(1rem, 3vw, 1.5rem);
+        animation: fadeSlideUp 0.55s 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .metrics-section h3 {
+        font-size: var(--size-h3);
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.75rem;
+    }
+
+    .metrics-section ul {
+        list-style: none;
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .metrics-section li {
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid var(--border-color);
+        padding: 0.45rem 0.875rem;
+        border-radius: var(--border-radius-sm);
+        font-size: var(--size-small);
+        color: var(--text-secondary);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .metrics-section li strong {
+        display: block;
+        font-size: var(--size-body);
+        font-weight: 600;
+        color: var(--text-main);
+        margin-bottom: 0.1em;
+    }
+
+    .metrics-section li:hover {
+        border-color: var(--accent-mid);
+        box-shadow: 0 2px 8px var(--accent-light);
+    }
+
+    /* === FOOTER === */
+    footer {
+        text-align: center;
+        margin-top: clamp(2rem, 5vw, 3rem);
+        color: var(--text-muted);
+        font-size: var(--size-small);
+    }
+
+    footer a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+        transition: opacity 0.2s ease;
+    }
+
+    footer a:hover { opacity: 0.75; }
+</style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-badge">微調展示</div>
+            <h1>Qwen2.5-0.5B · Chip2 SFT</h1>
+            <p>基於 OIG unified_chip2（20 萬筆對話）微調的緊湊型指令跟隨模型。在 Apple Silicon 上約 3 分鐘完成訓練。</p>
+        </header>
+
+        <main>
+            <div class="card selector-section">
+                <label for="example-selector">選擇提示詞</label>
+                <select id="example-selector" class="dropdown">
+                    <!-- Options injected by JS -->
+                </select>
+            </div>
+
+            <div class="card prompt-section">
+                <h2>提示詞</h2>
+                <textarea id="prompt-input" readonly>載入中...</textarea>
+            </div>
+
+            <div class="card">
+                <h2>模型輸出</h2>
+                <div class="comparison-grid">
+                    <div class="output-pane base-pane">
+                        <div class="pane-label base">
+                            <span class="dot"></span>
+                            <span id="base-model-label">基礎模型</span>
+                        </div>
+                        <textarea id="base-output" class="output-text" readonly>載入中...</textarea>
+                    </div>
+                    <div class="output-pane ft-pane">
+                        <div class="pane-label ft">
+                            <span class="dot"></span>
+                            <span id="ft-model-label">微調模型</span>
+                        </div>
+                        <textarea id="ft-output" class="output-text neutral" readonly>載入中...</textarea>
+                        <span id="quality-badge" class="quality-badge neutral">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metrics-section">
+                <h3>訓練詳情</h3>
+                <ul id="metrics-list">
+                    <li><strong>SFT</strong>方法</li>
+                    <li><strong>Qwen2.5-0.5B-Instruct</strong>基礎模型</li>
+                    <li><strong>OIG chip2</strong>資料集</li>
+                    <li><strong>199,774</strong>訓練樣本</li>
+                    <li><strong>200 步</strong>訓練</li>
+                    <li><strong>1.249</strong>最終訓練損失</li>
+                    <li><strong>~1.25</strong>最終驗證損失</li>
+                    <li><strong>LoRA r=8</strong>適配器</li>
+                    <li><strong>Apple Silicon</strong>硬體</li>
+                    <li><strong>~3–4 分鐘</strong>執行時間</li>
+                </ul>
+            </div>
+        </main>
+
+        <footer>
+            Built with <a href="https://github.com/TYH-labs/unsloth-buddy" target="_blank">unsloth-buddy</a> · <a href="https://gaslamp.dev" target="_blank">Gaslamp 🔥</a>
+        </footer>
+    </div>
+
+    <script>
+        const examples = [
+            {
+                "prompt": "Explain the difference between RAM and ROM.",
+                "base_output": "RAM stands for Random Access Memory and ROM stands for Read-Only Memory. RAM is used to store data that the CPU needs to access quickly, while ROM is used to store permanent data that cannot be changed. RAM is volatile, meaning it loses its data when the power is turned off, while ROM is non-volatile and retains its data even when the power is off. RAM is typically faster than ROM and is used for running programs and storing temporary data.",
+                "finetuned_output": "RAM (Random Access Memory) is temporary storage that your computer uses while running programs — fast, but erased when you power off. ROM (Read-Only Memory) is permanent storage that holds firmware (like your PC's BIOS) — it keeps its data without power and cannot normally be written to. Think of RAM as your desk workspace and ROM as a printed instruction manual bolted to the wall.",
+                "highlight_class": "positive"
+            },
+            {
+                "prompt": "How do I make a good cup of coffee?",
+                "base_output": "To make a good cup of coffee, you should start with fresh, high-quality coffee beans. Grind the beans just before brewing for maximum flavor. Use filtered water and the right water temperature (around 195-205°F). Choose appropriate brewing equipment for your preference. The coffee-to-water ratio matters — generally 1-2 tablespoons per 6 oz of water. Clean your equipment regularly to avoid stale flavors.",
+                "finetuned_output": "1. Start with fresh beans — buy whole beans and grind just before brewing.\n2. Use filtered water heated to 195–205°F (just off the boil).\n3. Measure your ratio: 1 gram of coffee per 15–17 ml of water is a good baseline.\n4. Brew method: pour-over and French press give you the most control over flavor.\n5. Clean your equipment after every use — old oils make coffee taste bitter.\n6. Taste and adjust: if too bitter, use less heat or coarser grind; if too weak, use more coffee.",
+                "highlight_class": "positive"
+            },
+            {
+                "prompt": "Give me three tips for staying productive while working from home.",
+                "base_output": "Working from home can be challenging, but there are several strategies that can help you stay productive. First, establish a dedicated workspace separate from your relaxation areas. Second, maintain a consistent schedule with set start and end times. Third, minimize distractions by turning off notifications and communicating your work hours to household members. Additionally, taking regular breaks can help maintain focus throughout the day.",
+                "finetuned_output": "1. Set hard boundaries on your work hours — pick a start time and a stop time and stick to them. Without a commute, work can bleed into everything.\n2. Create a dedicated workspace. Even a corner of a room works — the physical separation cues your brain to switch into work mode.\n3. Use time-blocking: schedule specific tasks into calendar slots instead of a general to-do list. Unstructured time disappears when distractions are one click away.",
+                "highlight_class": "positive"
+            },
+            {
+                "prompt": "What is the capital of Japan and what is it known for?",
+                "base_output": "The capital of Japan is Tokyo. It is known for being one of the world's most populous cities and a major global financial center. Tokyo is famous for its blend of ultramodern and traditional elements, including futuristic skyscrapers alongside historic temples. The city is renowned for its efficient public transportation system, world-class cuisine, and vibrant pop culture including anime and manga.",
+                "finetuned_output": "Tokyo is the capital of Japan. It is known for: its size (one of the world's largest metropolitan areas, ~37 million people), a blend of ultra-modern technology and ancient tradition, world-class food culture (more Michelin stars than any other city), efficient public transit, and its global influence on anime, fashion, and gaming.",
+                "highlight_class": "neutral"
+            },
+            {
+                "prompt": "What are the best practices for writing clean code?",
+                "base_output": "Clean code is code that is easy to read, understand, and maintain. Key practices include: use meaningful variable and function names, keep functions short and focused on a single task, write comments that explain why (not just what), follow consistent formatting and style conventions, avoid code duplication (DRY principle), handle errors gracefully, write unit tests, and refactor regularly.",
+                "finetuned_output": "Key practices for clean code:\n• Meaningful names: variables and functions should say what they do (e.g. `calculateTax()` not `doThing()`).\n• Single responsibility: each function does one thing. If you need to write \"and\" to describe it, split it.\n• Avoid magic numbers: replace `0.08` with `const TAX_RATE = 0.08`.\n• DRY (Don't Repeat Yourself): if you copy-paste code, extract a function.\n• Comments explain *why*, not *what* — the code itself should be readable enough to explain what.\n• Tests: untested code is unfinished code.",
+                "highlight_class": "positive"
+            }
+        ];
+
+        const BASE_MODEL_NAME = "Qwen2.5-0.5B-Instruct（基礎）";
+        const FT_MODEL_NAME   = "Qwen2.5-0.5B + chip2-sft LoRA";
+
+        const QUALITY_LABELS = {
+            positive: "✦ 改善",
+            neutral:  "≈ 相當",
+            negative: "↓ 回退"
+        };
+
+        const selector    = document.getElementById('example-selector');
+        const promptInput = document.getElementById('prompt-input');
+        const baseOutput  = document.getElementById('base-output');
+        const ftOutput    = document.getElementById('ft-output');
+        const qualityBadge = document.getElementById('quality-badge');
+        const baseLabel   = document.getElementById('base-model-label');
+        const ftLabel     = document.getElementById('ft-model-label');
+
+        function init() {
+            if (!examples || examples.length === 0) return;
+
+            baseLabel.textContent = BASE_MODEL_NAME;
+            ftLabel.textContent   = FT_MODEL_NAME;
+
+            examples.forEach((ex, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                const label = ex.prompt.substring(0, 55) + (ex.prompt.length > 55 ? '…' : '');
+                opt.text = `${i + 1}. ${label}`;
+                selector.appendChild(opt);
+            });
+
+            renderExample(0);
+            selector.addEventListener('change', e => renderExample(+e.target.value));
+        }
+
+        function renderExample(index) {
+            const ex = examples[index];
+            promptInput.value = ex.prompt;
+            baseOutput.value  = ex.base_output;
+            ftOutput.value    = ex.finetuned_output;
+
+            const cls = ex.highlight_class || 'neutral';
+            ftOutput.className = `output-text ${cls}`;
+            qualityBadge.className = `quality-badge ${cls}`;
+            qualityBadge.textContent = QUALITY_LABELS[cls] || cls;
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>
