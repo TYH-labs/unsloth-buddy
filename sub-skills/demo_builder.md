@@ -63,17 +63,48 @@ Do NOT base the decision on training method (SFT/DPO/GRPO).
 
 **No purple.** If the domain is ambiguous, default to `crisp-light` with blue.
 
-### 3b. Detect language and confirm
+### 3b. Detect language and confirm theme
 
-Detect the language of the current conversation. Then ask the user in a single confirmation message that covers both theme and language:
+Detect the language of the current conversation. Ask the user in a single confirmation message about both theme and language. Importantly, offer an option to use a popular design system from `getdesign.md`.
 
-> "For a **[domain]** model, I'll use the **[crisp-light / dark-signal]** theme with **[color]** accent — feels [trustworthy / bold / technical]. The demo UI will be in **[detected language]** to match our conversation. Want a different color, theme, or language?"
+> "For a **[domain]** model, I recommend the **[crisp-light / dark-signal]** base theme with a **[color]** accent. The demo UI will be in **[detected language]**. I can also customize this demo using a popular design system from getdesign.md. Want a different color, theme, language, or a specific design style?"
 
-If the user has been conversing in a non-English language (e.g. Chinese, Japanese, Spanish), default to that language for all UI strings. If the conversation is mixed or unclear, default to English.
+If the user has been conversing in a non-English language (e.g. Chinese, Japanese, Spanish), default to that language for all UI strings.
 
 Wait for their confirmation before generating.
 
-### 3c. Build UI strings for the chosen language
+### 3c. Fetch DESIGN.md Context (If a specific design is chosen)
+
+If the user requests a specific design — even with abstract, conceptual, or pop-culture keywords — do not wait or ask follow-up configuration questions. Follow "show don't tell":
+
+**Step 0 — Resolve the keyword to a brand name (required before searching).**
+
+The search script only accepts exact brand names from the catalog. Keywords like "matrix", "cyberpunk", "apple-like", "dark terminal", or movie/game references will return nothing. Before calling the script, reason from the keyword to the best-fit brand:
+
+| User's keyword | Reasoning | Best brand match |
+|---|---|---|
+| "matrix", "terminal green", "hacker", "cyberpunk" | Matrix = black bg + neon green code rain + monospace. Best match: Warp (dark terminal IDE with green/neon palette) or NVIDIA (black + neon green, GPU/AI brand). | `warp` or `nvidia` |
+| "star wars", "space", "sci-fi dark" | Dark with glowing accent on black. SpaceX fits: dark, technical, monospace. | `spacex` |
+| "minimal white", "apple-like", "clean premium" | High whitespace, single accent, product-as-hero. | `apple` |
+| "developer", "code editor", "VS Code vibe" | Dark editor aesthetic with file-tree chrome. | `cursor` |
+| "startup", "SaaS", "clean dark" | Modern SaaS dark + subtle purple or blue. | `vercel` or `linear.app` |
+| "fintech", "crypto", "exchange" | Dark with teal/blue, trust signals. | `kraken` or `coinbase` |
+| "AI product", "model card" | Clean AI brand with gradient or dark theme. | `mistral.ai`, `cohere`, or `anthropic` → `claude` |
+
+If the keyword doesn't map cleanly to one brand, pick the best single match and proceed — do not ask for confirmation.
+
+1. Run the design search script with the resolved brand name:
+   ```bash
+   python scripts/search_design.py "<resolved_brand_name>"
+   ```
+2. Download the `DESIGN.md` using the official CLI command:
+   ```bash
+   npx getdesign@latest add <exact_brand_name>
+   ```
+   *(If `npx` is unavailable, use `python scripts/search_design.py "<exact_brand_name>" --fetch > DESIGN.md` as a fallback).*
+3. Read the generated `DESIGN.md` to deeply understand that design's visual identity (fonts, colors, borders, shadows, spacing).
+
+### 3d. Build UI strings for the chosen language
 
 Use the table below for the target language. For languages not listed, translate from the English column — keep strings short and natural.
 
@@ -93,9 +124,12 @@ The `{{MODEL_NAME}}`, `{{MODEL_DESCRIPTION}}`, metric labels, and example output
 
 ---
 
-## Step 4: Build the Accent Override CSS
+## Step 4: Build the Accent Override CSS and Mockup
 
-For the chosen accent color, construct a small CSS override to inject into the template:
+Once you have the `DESIGN.md` constraints (or default rules if no specific design was chosen), immediately build the `demos/<project-name>/index.html` mockup so the user can review a functioning UI. Do not just describe the CSS changes—generate the file!
+
+**If using the default layout:**
+Construct a small CSS override to inject into the template for the chosen accent color.
 
 **crisp-light variant:**
 ```css
@@ -118,7 +152,13 @@ For the chosen accent color, construct a small CSS override to inject into the t
 }
 ```
 
-Replace the `/* {{INJECT_ACCENT_OVERRIDE}} */` comment in the template with this block.
+**If using a fetched DESIGN.md:**
+Decide first whether the design is a **shallow override** (accent color + font swap) or a **deep override** (different page structure, background scheme, or border-radius system).
+
+- **Shallow** — inject into `{{INJECT_ACCENT_OVERRIDE}}`: override `--font-display`, `--font-body`, `--bg-gradient`, `--card-bg`, `--text-main`, `--border-radius`, `--shadow-card`, and load any needed fonts via `@import` at the top of the block.
+- **Deep** (e.g. NVIDIA-style all-black layout, Apple black-hero + light-content split) — write the output file from scratch. The template's single injection point cannot handle structural changes. Skip straight to Step 5 and build the full HTML directly.
+
+Replace the `/* {{INJECT_ACCENT_OVERRIDE}} */` comment in the template with your CSS, or skip it entirely if doing a full rewrite.
 
 ---
 

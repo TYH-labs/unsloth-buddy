@@ -44,6 +44,7 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 | `scripts/unsloth_vision_example.py` | NVIDIA vision/multimodal training template — copy as `train.py` |
 | `scripts/mlx_eval_template.py` | Apple Silicon eval template — copy as `eval.py` |
 | `scripts/demo_server.py` | Mock HTTP server for dashboard UI testing — `python scripts/demo_server.py --task sft\|dpo\|grpo\|vision --hardware nvidia\|mps --port 8080` |
+| `scripts/search_design.py` | Search and fetch DESIGN.md brand templates — `python scripts/search_design.py <keyword>` to find a brand, `--fetch` to download its DESIGN.md |
 | `templates/gaslamp_template.md` | Roadbook template — copied by `init_project.py` as `gaslamp.md` in each new project |
 | `templates/dashboard.html` | Web dashboard UI (copy into project's `templates/`) |
 | `templates/gaslamp.png` | Dashboard logo asset |
