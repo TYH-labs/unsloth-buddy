@@ -32,6 +32,7 @@
         "./scripts/mlx_gaslamp_dashboard.py",
         "./scripts/terminal_dashboard.py",
         "./scripts/demo_server.py",
+        "./scripts/search_design.py",
         "./scripts/colab_training.py",
         "./scripts/setup_colab.py"
       ],
