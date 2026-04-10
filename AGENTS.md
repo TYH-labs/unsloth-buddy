@@ -33,6 +33,8 @@ scripts/demo_server.py         ← mock dashboard server for UI testing (--task 
 templates/gaslamp_template.md  ← roadbook template (copied as gaslamp.md into each project)
 templates/demo_llm_crisp.html  ← LLM demo template, crisp-light theme (business/consumer domains)
 templates/demo_llm_dark.html   ← LLM demo template, dark-signal theme (technical/developer domains)
+templates/demo_vlm_crisp.html  ← Vision demo template, crisp-light theme (multimodal domains)
+templates/demo_vlm_dark.html   ← Vision demo template, dark-signal theme (technical multimodal)
 ```
 
 ## Lifecycle (7 Phases + Demo)
