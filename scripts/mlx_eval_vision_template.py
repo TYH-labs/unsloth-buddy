@@ -41,11 +41,13 @@ def patch_adapter_config(adapter_path):
                 for k, v in cfg["lora_parameters"].items():
                     cfg[k] = v
                 cfg.pop("lora_parameters", None)
-                cfg.pop("fine_tune_type", None)
-                cfg.pop("num_layers", None)
-                f.seek(0)
-                json.dump(cfg, f, indent=2)
-                f.truncate()
+            
+            cfg.pop("fine_tune_type", None)
+            cfg.pop("num_layers", None)
+            cfg.pop("keys", None)
+            f.seek(0)
+            json.dump(cfg, f, indent=2)
+            f.truncate()
 
 def load_model(adapter_path, load_adapter=True):
     kwargs = {}
