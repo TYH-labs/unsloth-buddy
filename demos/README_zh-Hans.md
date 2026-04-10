@@ -14,7 +14,8 @@
 
 | 示例 | 方法 | 模型 | 数据集 | 硬件 | 产出 |
 |------|------|------|--------|------|------|
-| [qwen2.5-0.5b-chip2-sft](./qwen2.5-0.5b-chip2-sft/gaslamp.md) | SFT | Qwen2.5-0.5B-Instruct | OIG unified_chip2（20 万对话） | Apple Silicon | 轻量指令跟随模型，M 系芯片约 3 分钟完成训练 |
+| [qwen2.5-0.5b-chip2-sft](./qwen2.5-0.5b-chip2-sft/gaslamp.md) | SFT | Qwen2.5-0.5B-Instruct | OIG unified_chip2（20 万对话） | Apple Silicon | 轻量指令跟随模型，M 系芯片约 3 分钟完成训练 | [示例](./qwen2.5-0.5b-chip2-sft/index.html) |
+| [gemma4-htr-sft](./gemma4_htr_sft_2026_04_07/gaslamp.md) | SFT | Gemma 4 2B Vision | Teklia/IAM-line | Apple Silicon | 多模态手写文本识别 (HTR) — 4-bit 视觉微调 | [示例](./gemma4_htr_sft_2026_04_07/index.html) |
 
 ---
 

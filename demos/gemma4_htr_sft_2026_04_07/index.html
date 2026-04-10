@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemma 4 HTR SFT — Fine-tuning Demo</title>
+    <meta name="description" content="Handwritten Text Recognition run on MLX">
+    <!-- style: crisp-light | vibe: clean, minimal, premium -->
+    <!-- fonts: DM Sans (body) + Instrument Serif (display) via Google Fonts -->
+<style>
+    /* === FONT IMPORT === */
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap');
+
+    /* === DESIGN TOKENS (crisp-light base) === */
+    :root {
+        --bg-gradient: linear-gradient(145deg, #e8edf3 0%, #f4f6f9 60%, #eef1f6 100%);
+        --card-bg: rgba(255, 255, 255, 0.72);
+        --card-border: rgba(255, 255, 255, 0.9);
+        --text-main: #111827;
+        --text-secondary: #6b7280;
+        --text-muted: #9ca3af;
+        --accent: #0052cc;               /* overridden per-domain below */
+        --accent-light: rgba(0, 82, 204, 0.08);
+        --accent-mid: rgba(0, 82, 204, 0.18);
+        --border-color: rgba(0, 0, 0, 0.06);
+        --border-radius: 20px;
+        --border-radius-sm: 12px;
+        --blur: blur(24px);
+        --shadow-card: 0 4px 32px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+        --shadow-card-hover: 0 8px 48px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06);
+
+        /* Clamp-based typography */
+        --font-display: 'Instrument Serif', Georgia, serif;
+        --font-body: 'DM Sans', system-ui, sans-serif;
+        --size-h1: clamp(1.75rem, 4vw + 0.5rem, 2.75rem);
+        --size-h2: clamp(1.0rem, 1.8vw + 0.2rem, 1.25rem);
+        --size-h3: clamp(0.7rem, 0.9vw + 0.05rem, 0.8125rem);
+        --size-body: clamp(0.875rem, 1.2vw + 0.1rem, 1rem);
+        --size-small: clamp(0.75rem, 0.9vw, 0.875rem);
+        --size-badge: clamp(0.75rem, 1.0vw, 0.875rem);
+
+        --gap-card: clamp(1rem, 3vw, 1.5rem);
+        --pad-card: clamp(1.25rem, 3vw, 1.875rem);
+        --pad-page: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 4vw, 1.5rem);
+    }
+
+    /* === DOMAIN ACCENT OVERRIDE — injected by agent ===
+       Example: --accent: #047857; (finance green)
+       Replace these three lines with the domain-specific accent.
+    */
+    /* default blue */
+
+    
+    /* === VLM LAYOUT === */
+    .vlm-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: clamp(1rem, 3vw, 2rem);
+    }
+    
+    .image-showcase {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 200px;
+        background: rgba(0, 0, 0, 0.02);
+        border: 1px solid var(--card-border);
+        border-radius: var(--border-radius-sm);
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .image-showcase img {
+        width: 100%;
+        max-width: 800px;
+        height: auto;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .image-caption {
+        margin-top: 1rem;
+        font-size: var(--size-small);
+        color: var(--text-secondary);
+        font-weight: 500;
+        text-align: center;
+    }
+
+    /* === BASE === */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: var(--font-body);
+        font-size: var(--size-body);
+        background: var(--bg-gradient);
+        background-attachment: fixed;
+        color: var(--text-main);
+        padding: var(--pad-page);
+        display: flex;
+        justify-content: center;
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .container { max-width: 900px; width: 100%; }
+
+    /* === HEADER === */
+    header {
+        text-align: center;
+        margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+        padding-bottom: clamp(1rem, 2vw, 1.5rem);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .header-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4em;
+        padding: 0.25em 0.75em;
+        border-radius: 100px;
+        background: var(--accent-light);
+        color: var(--accent);
+        font-size: var(--size-small);
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 0.9rem;
+    }
+
+    h1 {
+        font-family: var(--font-display);
+        font-size: var(--size-h1);
+        font-weight: 400;
+        letter-spacing: -0.01em;
+        line-height: 1.15;
+        color: var(--text-main);
+        margin-bottom: 0.4em;
+    }
+
+    header p {
+        color: var(--text-secondary);
+        font-size: var(--size-body);
+        line-height: 1.5;
+        font-weight: 400;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* === CARD === */
+    .card {
+        background: var(--card-bg);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        border-radius: var(--border-radius);
+        padding: var(--pad-card);
+        margin-bottom: var(--gap-card);
+        box-shadow: var(--shadow-card);
+        border: 1px solid var(--card-border);
+        transition: box-shadow 0.25s ease, transform 0.2s ease;
+
+        opacity: 0;
+        transform: translateY(18px);
+        animation: fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .card:hover {
+        box-shadow: var(--shadow-card-hover);
+        transform: translateY(-2px);
+    }
+
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.12s; }
+    .card:nth-child(3) { animation-delay: 0.19s; }
+    .card:nth-child(4) { animation-delay: 0.26s; }
+
+    @keyframes fadeSlideUp {
+        from { opacity: 0; transform: translateY(18px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .card { animation: none; opacity: 1; transform: none; }
+    }
+
+    h2 {
+        font-family: var(--font-body);
+        font-size: var(--size-h2);
+        font-weight: 600;
+        margin-bottom: 0.8em;
+        color: var(--text-main);
+        letter-spacing: -0.01em;
+    }
+
+    /* === SELECTOR === */
+    .selector-section { display: flex; flex-direction: column; gap: 0.6rem; }
+
+    .selector-section label {
+        font-size: var(--size-small);
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .dropdown {
+        width: 100%;
+        padding: 0.7rem 1rem;
+        font-size: var(--size-body);
+        font-family: var(--font-body);
+        border-radius: var(--border-radius-sm);
+        border: 1.5px solid var(--border-color);
+        background-color: rgba(255, 255, 255, 0.9);
+        color: var(--text-main);
+        cursor: pointer;
+        outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 1rem center;
+        padding-right: 2.5rem;
+    }
+
+    .dropdown:hover { border-color: var(--accent); }
+    .dropdown:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-mid); outline: none; }
+
+    /* === PROMPT INPUT === */
+    .prompt-section textarea {
+        width: 100%;
+        min-height: 90px;
+        border: 1.5px solid var(--border-color);
+        border-radius: var(--border-radius-sm);
+        padding: 0.875rem 1rem;
+        font-size: var(--size-body);
+        font-family: var(--font-body);
+        background: rgba(255, 255, 255, 0.9);
+        color: var(--text-main);
+        resize: none;
+        line-height: 1.55;
+        transition: border-color 0.2s ease;
+    }
+
+    /* === COMPARISON GRID === */
+    .comparison-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: clamp(0.75rem, 2vw, 1.25rem);
+        margin-top: 0.25rem;
+    }
+
+    @media (max-width: 600px) {
+        .comparison-grid { grid-template-columns: 1fr; }
+    }
+
+    .output-pane {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .pane-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5em;
+        font-size: var(--size-small);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--text-secondary);
+    }
+
+    .pane-label .dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .pane-label.base .dot    { background: var(--text-muted); }
+    .pane-label.ft .dot      { background: var(--accent); }
+    .pane-label.ft           { color: var(--accent); }
+
+    .output-text {
+        width: 100%;
+        min-height: 140px;
+        border: 1.5px solid var(--border-color);
+        border-radius: var(--border-radius-sm);
+        padding: 0.875rem 1rem;
+        font-size: var(--size-body);
+        font-family: var(--font-body);
+        background: rgba(255, 255, 255, 0.85);
+        color: var(--text-main);
+        resize: none;
+        line-height: 1.6;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* Fine-tuned pane highlight based on quality class */
+    .ft-pane .output-text.positive {
+        border-left: 3px solid #059669;
+        background: rgba(5, 150, 105, 0.03);
+    }
+    .ft-pane .output-text.neutral {
+        border-left: 3px solid var(--accent);
+        background: rgba(0, 82, 204, 0.02);
+    }
+    .ft-pane .output-text.negative {
+        border-left: 3px solid #dc2626;
+        background: rgba(220, 38, 38, 0.03);
+    }
+
+    /* === QUALITY BADGE === */
+    .quality-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35em;
+        padding: 0.2em 0.65em;
+        border-radius: 100px;
+        font-size: var(--size-badge);
+        font-weight: 600;
+        margin-top: 0.35rem;
+        align-self: flex-start;
+    }
+
+    .quality-badge::before {
+        content: '';
+        display: block;
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: 0.8;
+    }
+
+    .quality-badge.positive { background: #ecfdf5; color: #065f46; }
+    .quality-badge.neutral  { background: #f3f4f6; color: #374151; }
+    .quality-badge.negative { background: #fef2f2; color: #991b1b; }
+
+    /* === METRICS STRIP === */
+    .metrics-section {
+        margin-top: clamp(1.5rem, 4vw, 2.5rem);
+        border-top: 1px solid var(--border-color);
+        padding-top: clamp(1rem, 3vw, 1.5rem);
+        animation: fadeSlideUp 0.55s 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .metrics-section h3 {
+        font-size: var(--size-h3);
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.75rem;
+    }
+
+    .metrics-section ul {
+        list-style: none;
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .metrics-section li {
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid var(--border-color);
+        padding: 0.45rem 0.875rem;
+        border-radius: var(--border-radius-sm);
+        font-size: var(--size-small);
+        color: var(--text-secondary);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .metrics-section li strong {
+        display: block;
+        font-size: var(--size-body);
+        font-weight: 600;
+        color: var(--text-main);
+        margin-bottom: 0.1em;
+    }
+
+    .metrics-section li:hover {
+        border-color: var(--accent-mid);
+        box-shadow: 0 2px 8px var(--accent-light);
+    }
+
+    /* === FOOTER === */
+    footer {
+        text-align: center;
+        margin-top: clamp(2rem, 5vw, 3rem);
+        color: var(--text-muted);
+        font-size: var(--size-small);
+    }
+
+    footer a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+        transition: opacity 0.2s ease;
+    }
+
+    footer a:hover { opacity: 0.75; }
+</style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-badge">Fine-tuning Demo</div>
+            <h1>Gemma 4 HTR SFT</h1>
+            <p>Handwritten Text Recognition run on MLX</p>
+        </header>
+
+        <main>
+            <div class="card selector-section">
+                <label for="example-selector">Select a Sample</label>
+                <select id="example-selector" class="dropdown">
+                    <!-- Options injected by JS -->
+                </select>
+            </div>
+
+            
+            <div class="card vlm-prompt-section">
+                <h2>Prompt</h2>
+                <div class="image-showcase" id="image-container" style="display: none;">
+                    <img id="vlm-image" src="" alt="Input Image">
+                    <div class="image-caption" id="vlm-prompt-text"></div>
+                </div>
+            </div>
+    
+
+            <div class="card">
+                <h2>Model Outputs</h2>
+                <div class="comparison-grid">
+                    <div class="output-pane base-pane">
+                        <div class="pane-label base">
+                            <span class="dot"></span>
+                            <span id="base-model-label">Base Model</span>
+                        </div>
+                        <textarea id="base-output" class="output-text" readonly>Loading...</textarea>
+                    </div>
+                    <div class="output-pane ft-pane">
+                        <div class="pane-label ft">
+                            <span class="dot"></span>
+                            <span id="ft-model-label">Fine-tuned Model</span>
+                        </div>
+                        <textarea id="ft-output" class="output-text neutral" readonly>Loading...</textarea>
+                        <span id="quality-badge" class="quality-badge neutral">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metrics-section">
+                <h3>Training Details</h3>
+                <ul id="metrics-list">
+                    
+<li><strong>300</strong> steps</li>
+<li><strong>Teklia/IAM-line</strong> dataset</li>
+
+                </ul>
+            </div>
+        </main>
+
+        <footer>
+            Built with <a href="https://github.com/TYH-labs/unsloth-buddy" target="_blank">unsloth-buddy</a> · <a href="https://gaslamp.dev" target="_blank">Gaslamp 🔥</a>
+        </footer>
+    </div>
+
+    <script>
+        // ── DATA ──────────────────────────────────────────────────────────────
+        // Schema per example:
+        // {
+        //   "prompt":           string   — the input prompt shown to the user
+        //   "base_output":      string   — response from the *base* (untuned) model
+        //   "finetuned_output": string   — response from the fine-tuned model
+        //   "highlight_class":  "positive" | "neutral" | "negative"
+        //                       positive = fine-tuned clearly better
+        //                       neutral  = comparable quality
+        //                       negative = regression (be honest!)
+        // }
+        // Vision/image input: set "type": "image" and "image_url": "<data URI or URL>"
+        // instead of "prompt"; the script will render an <img> instead of a textarea.
+        const examples = [
+    {
+        "type": "image",
+        "image_url": "assets/compare_sample_1.png",
+        "image_caption": "Transcribe the handwritten text exactly as written.",
+        "base_output": "It was a splendid interpretation of that",
+        "finetuned_output": "It was a splendid interpretation of that",
+        "highlight_class": "neutral"
+    },
+    {
+        "type": "image",
+        "image_url": "assets/compare_sample_2.png",
+        "image_caption": "Transcribe the handwritten text exactly as written.",
+        "base_output": "sympathetic C. Paul Daneman gave another",
+        "finetuned_output": "sympathetic C. Paul Daneman gave another",
+        "highlight_class": "neutral"
+    },
+    {
+        "type": "image",
+        "image_url": "assets/compare_sample_3.png",
+        "image_caption": "Transcribe the handwritten text exactly as written.",
+        "base_output": "part. The rest of the cast were well chosen,",
+        "finetuned_output": "part. The rest of the cast were well chosen,",
+        "highlight_class": "neutral"
+    }
+];
+
+        const BASE_MODEL_NAME = "gemma-4-E2B-it";
+        const FT_MODEL_NAME   = "gemma4-htr-sft";
+
+        const QUALITY_LABELS = {
+            positive: "✦ Improved",
+            neutral:  "≈ Comparable",
+            negative: "↓ Regression"
+        };
+
+        // ── DOM REFS ──────────────────────────────────────────────────────────
+        const selector      = document.getElementById('example-selector');
+        const promptInput   = document.getElementById('prompt-input');
+        const baseOutput    = document.getElementById('base-output');
+        const ftOutput      = document.getElementById('ft-output');
+        const qualityBadge  = document.getElementById('quality-badge');
+        const baseLabel     = document.getElementById('base-model-label');
+        const ftLabel       = document.getElementById('ft-model-label');
+
+        // ── INIT ──────────────────────────────────────────────────────────────
+        function init() {
+            if (!examples || examples.length === 0) return;
+
+            baseLabel.textContent = BASE_MODEL_NAME;
+            ftLabel.textContent   = FT_MODEL_NAME;
+
+            examples.forEach((ex, i) => {
+                const opt   = document.createElement('option');
+                opt.value   = i;
+                const label = ex.prompt
+                    ? ex.prompt.substring(0, 50) + (ex.prompt.length > 50 ? '…' : '')
+                    : `Image Example ${i + 1}`;
+                opt.text = `${i + 1}. ${label}`;
+                selector.appendChild(opt);
+            });
+
+            renderExample(0);
+            selector.addEventListener('change', e => renderExample(+e.target.value));
+        }
+
+        // ── RENDER ────────────────────────────────────────────────────────────
+        function renderExample(index) {
+            const ex = examples[index];
+
+            // Prompt or image input
+            const imageContainer = document.getElementById('image-container');
+            const vlmImage = document.getElementById('vlm-image');
+            const vlmPromptText = document.getElementById('vlm-prompt-text');
+            
+            if (ex.type === 'image' && ex.image_url) {
+                imageContainer.style.display = 'flex';
+                vlmImage.style.display = 'block';
+                vlmImage.src = ex.image_url;
+                vlmPromptText.textContent = ex.prompt || ex.image_caption || '';
+            } else {
+                imageContainer.style.display = 'flex';
+                vlmImage.style.display = 'none';
+                vlmPromptText.textContent = ex.prompt || '';
+            }
+
+            // Outputs
+            baseOutput.value = ex.base_output || '';
+            ftOutput.value   = ex.finetuned_output || '';
+
+            // Quality class
+            const cls = ex.highlight_class || 'neutral';
+            ftOutput.className = `output-text ${cls}`;
+            qualityBadge.className = `quality-badge ${cls}`;
+            qualityBadge.textContent = QUALITY_LABELS[cls] || cls;
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>

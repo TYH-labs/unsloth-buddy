@@ -139,12 +139,12 @@ customer_faq_sft_2026_03_17/
 |---|---|---|
 | NVIDIA T4 (16 GB) | `unsloth` | 7B QLoRA，小规模 GRPO |
 | NVIDIA A100 (80 GB) | `unsloth` | 70B QLoRA，14B LoRA 16-bit |
-| Apple M1 / M2 / M3 / M4 | `mlx-tune` / `trl` | SFT/DPO：10 GB 跑 7B，24 GB 跑 13B；GRPO：1–7B（TRL + PyTorch MPS）|
+| Apple M1 / M2 / M3 / M4 | `mlx-tune` / `mlx-vlm` / `trl` | SFT/DPO：10 GB 跑 7B，24 GB 跑 13B；通过 `mlx-vlm` 支持视觉 SFT；GRPO：1–7B（TRL + PyTorch MPS）|
 | Google Colab (T4/L4/A100) | `unsloth` 通过 `colab-mcp` | 免费云端 GPU，可选接入 |
 
 Unsloth 相比标准 HuggingFace 训练速度快约 2 倍，VRAM 使用量减少高达 80%，且使用精确梯度。
 
-**支持的训练方法：** SFT、DPO、GRPO、ORPO、KTO、SimPO、视觉 SFT（Qwen2.5-VL、Llama 3.2 Vision、Gemma 3）
+**支持的训练方法：** SFT、DPO、GRPO、ORPO、KTO、SimPO、视觉 SFT（Qwen2.5-VL、Llama 3.2 Vision、Gemma 3、Gemma 4）
 
 ---
 
@@ -230,6 +230,7 @@ Apple Silicon 用户如需更大的模型或 CUDA 专属功能，可将训练卸
 
 ## 更新日志
 
+- **2026-04-10** — 新增 Apple Silicon 原生**视觉 SFT 支持**：集成 [mlx-vlm](https://github.com/Blaizzy/mlx-vlm) 以支持在 M 系列芯片上进行多模态微调（如 Gemma 4 Vision、Qwen2.5-VL）。新增 `scripts/unsloth_mlx_vision_example.py` 训练模板和 `mlx_eval_vision_template.py` 视觉对比评估脚本。演示生成器现已支持宽屏 VLM 布局（`vlm-crisp`、`vlm-dark`）及 PNG 资源本地打包，确保多模态演示看板的离线可用性。
 - **2026-04-09** — 演示生成器改进：自动将概念/电影类关键词（如 "matrix" → nvidia，"star wars" → spacex）解析并映射至最匹配的品牌；区分浅层与深层 DESIGN.md 覆盖 —— 深层覆盖（如全黑或局部大面积结构性分割布局）将跳过 CSS 注入点，从头开始写入演示文件。将 `scripts/search_design.py` 补充至技能脚本汇总，即使环境内无 `npx` 也可直接获取品牌设计模板。
 - **2026-04-04** — 新增演示生成器（第 5.5 阶段）：评估完成后生成静态 HTML 演示页面，并排展示基础模型与微调模型输出。内置两套主题（crisp-light、dark-signal），支持基于领域的自动强调色。无需服务器 — 在任意浏览器中直接打开。属于 [Gaslamp](https://gaslamp.dev/) 展示工具的简化版本。访谈从 5 点合同简化为 2 个问题（任务 + 数据），同时捕获用户领域/受众以用于演示主题选择。
 - **2026-03-22** — 新增 `gaslamp.md` 可复现路书：每个项目现在都会记录所有已确定的决策及其原因，并附带 📖 ML 概念学习模块（方法、模型、数据、超参数、评估、导出），任何 Agent 或人员均可端到端复现项目并理解每个决策背后的原因。模板文件位于 `templates/gaslamp_template.md`，由 `init_project.py` 自动生成。

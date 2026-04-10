@@ -22,6 +22,7 @@
         "./scripts/detect_system.py",
         "./scripts/detect_env.py",
         "./scripts/mlx_eval_template.py",
+        "./scripts/mlx_eval_vision_template.py",
         "./scripts/gaslamp_callback.py",
         "./scripts/unsloth_sft_example.py",
         "./scripts/unsloth_dpo_example.py",
@@ -29,6 +30,7 @@
         "./scripts/mps_grpo_example.py",
         "./scripts/unsloth_vision_example.py",
         "./scripts/unsloth_mlx_sft_example.py",
+        "./scripts/unsloth_mlx_vision_example.py",
         "./scripts/mlx_gaslamp_dashboard.py",
         "./scripts/terminal_dashboard.py",
         "./scripts/demo_server.py",
@@ -41,7 +43,9 @@
         "./templates/dashboard.html",
         "./templates/gaslamp.png",
         "./templates/demo_llm_crisp.html",
-        "./templates/demo_llm_dark.html"
+        "./templates/demo_llm_dark.html",
+        "./templates/demo_vlm_crisp.html",
+        "./templates/demo_vlm_dark.html"
       ],
       "agents": [
         "./AGENTS.md"

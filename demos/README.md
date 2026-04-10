@@ -15,6 +15,7 @@ Every example is a single file. Hand it to any agent running [unsloth-buddy](htt
 | Example | Method | Model | Dataset | Hardware | What you get | Demo |
 |---------|--------|-------|---------|----------|--------------|------|
 | [qwen2.5-0.5b-chip2-sft](./qwen2.5-0.5b-chip2-sft/gaslamp.md) | SFT | Qwen2.5-0.5B-Instruct | OIG unified_chip2 (200k turns) | Apple Silicon | Compact instruction-following model, ~3 min on M-series Mac | [demo](./qwen2.5-0.5b-chip2-sft/index.html) |
+| [gemma4-htr-sft](./gemma4_htr_sft_2026_04_07/gaslamp.md) | SFT | Gemma 4 2B Vision | Teklia/IAM-line | Apple Silicon | Multimodal Handwriting Text Recognition (HTR) — 4-bit vision fine-tuning | [demo](./gemma4_htr_sft_2026_04_07/index.html) |
 
 ---
 

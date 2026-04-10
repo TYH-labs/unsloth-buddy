@@ -37,12 +37,14 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 | `scripts/colab_training.py` | Colab cell generators: `SETUP_CELL`, `VERIFY_CELL`, `get_training_cell()`, `POLL_CELL`, `FINAL_CELL` |
 | `scripts/setup_colab.py` | Colab environment setup utilities |
 | `scripts/unsloth_mlx_sft_example.py` | **Apple Silicon SFT training template** — copy as `train.py` |
+| `scripts/unsloth_mlx_vision_example.py` | **Apple Silicon vision training template** — copy as `train.py` |
 | `scripts/unsloth_sft_example.py` | NVIDIA SFT training template — copy as `train.py` |
 | `scripts/unsloth_dpo_example.py` | NVIDIA DPO training template — copy as `train.py` |
 | `scripts/unsloth_grpo_example.py` | NVIDIA GRPO training template — copy as `train.py` |
 | `scripts/mps_grpo_example.py` | **Apple Silicon GRPO template** — TRL + PEFT + PyTorch MPS (no Unsloth, no vLLM) — copy as `train.py` |
 | `scripts/unsloth_vision_example.py` | NVIDIA vision/multimodal training template — copy as `train.py` |
 | `scripts/mlx_eval_template.py` | Apple Silicon eval template — copy as `eval.py` |
+| `scripts/mlx_eval_vision_template.py` | **Apple Silicon vision eval template** — copy as `eval.py` |
 | `scripts/demo_server.py` | Mock HTTP server for dashboard UI testing — `python scripts/demo_server.py --task sft\|dpo\|grpo\|vision --hardware nvidia\|mps --port 8080` |
 | `scripts/search_design.py` | Search and fetch DESIGN.md brand templates — `python scripts/search_design.py <keyword>` to find a brand, `--fetch` to download its DESIGN.md |
 | `templates/gaslamp_template.md` | Roadbook template — copied by `init_project.py` as `gaslamp.md` in each new project |
@@ -50,6 +52,8 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 | `templates/gaslamp.png` | Dashboard logo asset |
 | `templates/demo_llm_crisp.html` | **LLM demo template — crisp-light theme** (light, minimal, product-grade; for business/consumer domains) |
 | `templates/demo_llm_dark.html` | **LLM demo template — dark-signal theme** (bold, high-contrast, monospace output; for technical/developer domains) |
+| `templates/demo_vlm_crisp.html` | **Vision demo template — crisp-light** (wide layout for images; for consumer/multimodal domains) |
+| `templates/demo_vlm_dark.html` | **Vision demo template — dark-signal** (wide layout for images; for technical/multimodal domains) |
 
 ## The 7-Phase End-to-End Lifecycle
 
@@ -236,9 +240,12 @@ Ask the user which path they prefer if the model is >8B or requires CUDA feature
 **If using Colab (Path A):** Phases A5–A7 above already cover training and monitoring. Skip to Phase 5 once `FINAL_CELL` returns successfully.
 
 **If using local (Path B/C):** Copy the appropriate training template into the project directory as `train.py`, then customise the top-level config variables — do NOT generate from scratch:
-- **Apple Silicon — SFT (mlx-tune)**:
+- **Apple Silicon — SFT/Vision (mlx-tune)**:
   ```bash
+  # For text models:
   cp ./scripts/unsloth_mlx_sft_example.py train.py
+  # For vision models:
+  cp ./scripts/unsloth_mlx_vision_example.py train.py
   ```
   Edit the `CONFIG` block at the top of `train.py` (MODEL_NAME, DATASET_ID, ITERS, LEARNING_RATE, etc.).
   Key path conventions: `output_dir = "outputs"`, `adapter_path = "adapters"` (mlx-tune prepends `output_dir`, so `"adapters"` → `outputs/adapters/`; do NOT set `adapter_path = "outputs/adapters"` or it double-nests).
