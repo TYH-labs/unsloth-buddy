@@ -94,28 +94,29 @@ def run_batch(model, processor, dataset, max_tokens=MAX_TOKENS):
         if image is None:
             continue
             
-        temp_img = f".temp_{i}.png"
-        image.save(temp_img)
+        os.makedirs("logs/eval_images", exist_ok=True)
+        img_path = f"logs/eval_images/batch_sample_{i+1}.png"
+        image.save(img_path)
         
-        print(f"\\nSample {i+1}:")
+        print(f"\nSample {i+1} (Image: {img_path}):")
         print(f"[GROUND TRUTH] {ground_truth}")
         
         try:
-            res = generate(model, processor, prompt, [temp_img], max_tokens=max_tokens, verbose=False)
+            res = generate(model, processor, prompt, [img_path], max_tokens=max_tokens, verbose=False)
             print(f"[TUNED MODEL]  {res.text.strip()}")
-        finally:
-            if os.path.exists(temp_img): os.remove(temp_img)
+        except Exception as e:
+            print(f"[ERROR] {e}")
 
 def run_compare(dataset, max_tokens=MAX_TOKENS):
-    print(f"\\n{'='*60}")
+    print(f"\n{'='*60}")
     print(f"BASE vs FINE-TUNED comparison  |  dataset={DATASET_ID}")
     print(f"{'='*60}")
 
-    print("\\nLoading base model...")
+    print("\nLoading base model...")
     base_model, processor = load_model(ADAPTER_PATH, load_adapter=False)
     
     # Because MLX handles memory eagerly, we simply continue instead of resetting 
-    print("\\nLoading fine-tuned model...")
+    print("\nLoading fine-tuned model...")
     ft_model, _ = load_model(ADAPTER_PATH, load_adapter=True)
 
     prompt = build_prompt(processor)
@@ -129,20 +130,21 @@ def run_compare(dataset, max_tokens=MAX_TOKENS):
         if image is None:
             continue
             
-        temp_img = f".temp_cmp_{i}.png"
-        image.save(temp_img)
+        os.makedirs("logs/eval_images", exist_ok=True)
+        img_path = f"logs/eval_images/compare_sample_{i+1}.png"
+        image.save(img_path)
         
-        print(f"\\nSample {i+1}:")
+        print(f"\nSample {i+1} (Image: {img_path}):")
         print(f"[GROUND TRUTH] {ground_truth}")
         
         try:
-            base_res = generate(base_model, processor, prompt, [temp_img], max_tokens=max_tokens, verbose=False)
+            base_res = generate(base_model, processor, prompt, [img_path], max_tokens=max_tokens, verbose=False)
             print(f"[BASE MODEL]   {base_res.text.strip()}")
             
-            ft_res = generate(ft_model, processor, prompt, [temp_img], max_tokens=max_tokens, verbose=False)
+            ft_res = generate(ft_model, processor, prompt, [img_path], max_tokens=max_tokens, verbose=False)
             print(f"[TUNED MODEL]  {ft_res.text.strip()}")
-        finally:
-            if os.path.exists(temp_img): os.remove(temp_img)
+        except Exception as e:
+            print(f"[ERROR] {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate a fine-tuned mlx-tune Vision model")
