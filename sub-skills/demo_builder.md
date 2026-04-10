@@ -39,7 +39,7 @@ Select **4–6 diverse prompts** that best showcase the model's improved capabil
 - 1–2 neutral examples showing comparable quality (`highlight_class: "neutral"`)
 - Optionally 1 honest regression if one exists (`highlight_class: "negative"`) — this builds trust
 
-For **vision models**: extract the image, convert it to a Base64 data URI string (e.g. `data:image/png;base64,...`), and set that as `"image_url"`. This ensures the HTML file remains completely zero-dependency and locally portable without broken links.
+For **vision models**: extract the images, copy them into an `assets/` subdirectory parallel to the generated `index.html` (e.g. `demos/<project-name>/assets/sample_1.png`), and set `"image_url"` to that relative path `"assets/sample_1.png"`.
 
 ---
 
@@ -205,11 +205,11 @@ const examples = [
 ];
 ```
 
-For **vision inputs**, explicitly convert local testing images into Base64 data URIs so the HTML remains completely zero-dependency and offline-ready:
+For **vision inputs**, explicitly copy local testing images into the `assets/` folder alongside the demo and use relative paths:
 ```js
 {
     "type": "image",
-    "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD...",
+    "image_url": "assets/compare_sample_1.png",
     "image_caption": "A chest X-ray showing ...",
     "base_output": "I see a medical image.",
     "finetuned_output": "The chest X-ray shows a right lower lobe opacity consistent with pneumonia.",
