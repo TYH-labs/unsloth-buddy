@@ -50,18 +50,19 @@ For **vision models**: extract the image, convert it to a Base64 data URI string
 Ask yourself: **What domain or audience does this model serve?**
 Do NOT base the decision on training method (SFT/DPO/GRPO).
 
-| User domain / audience | Template | Default accent |
-|---|---|---|
-| Customer support / conversational chat | `demo_llm_crisp.html` | `#0052cc` blue |
-| Healthcare / clinical / medical NLP | `demo_llm_crisp.html` | `#0891b2` cyan-teal |
-| Finance / compliance / legal | `demo_llm_crisp.html` | `#047857` green |
-| Education / tutoring / learning tools | `demo_llm_crisp.html` | `#d97706` amber |
-| Code generation / DevOps / tooling | `demo_llm_dark.html` | `#00e5ff` electric cyan |
-| Math / reasoning / science | `demo_llm_dark.html` | `#d4ff00` neon yellow |
-| Security / threat detection / fraud | `demo_llm_dark.html` | `#ff4d6d` red |
-| General / unspecified | `demo_llm_crisp.html` | `#0052cc` blue |
+| User domain / audience | Text-only Model Template | Vision Model Template | Default accent |
+|---|---|---|---|
+| Customer support / conversational chat | `demo_llm_crisp.html` | `demo_vlm_crisp.html` | `#0052cc` blue |
+| Healthcare / clinical / medical NLP | `demo_llm_crisp.html` | `demo_vlm_crisp.html` | `#0891b2` cyan-teal |
+| Finance / compliance / legal | `demo_llm_crisp.html` | `demo_vlm_crisp.html` | `#047857` green |
+| Education / tutoring / learning tools | `demo_llm_crisp.html` | `demo_vlm_crisp.html` | `#d97706` amber |
+| Code generation / DevOps / tooling | `demo_llm_dark.html` | `demo_vlm_dark.html` | `#00e5ff` electric cyan |
+| Math / reasoning / science | `demo_llm_dark.html` | `demo_vlm_dark.html` | `#d4ff00` neon yellow |
+| Security / threat detection / fraud | `demo_llm_dark.html` | `demo_vlm_dark.html` | `#ff4d6d` red |
+| General / unspecified | `demo_llm_crisp.html` | `demo_vlm_crisp.html` | `#0052cc` blue |
 
 **No purple.** If the domain is ambiguous, default to `crisp-light` with blue.
+*(Note: If the project involves vision data—i.e., you extracted `image_url` keys in Step 2—you MUST use the `demo_vlm_*` templates, which pre-pack layout grids optimized for wide image viewing rather than just text areas!)*
 
 ### 3b. Detect language and confirm theme
 
@@ -164,7 +165,7 @@ Replace the `/* {{INJECT_ACCENT_OVERRIDE}} */` comment in the template with your
 
 ## Step 5: Fill in the Template Placeholders
 
-Read the chosen template from `templates/demo_llm_crisp.html` (or `demo_llm_dark.html`) and perform these substitutions:
+Read the chosen template from `templates/demo_llm_crisp.html` (or its `_dark` / `_vlm` variants) and perform these substitutions:
 
 | Placeholder | Value |
 |---|---|
