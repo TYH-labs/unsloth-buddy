@@ -39,7 +39,7 @@ Select **4–6 diverse prompts** that best showcase the model's improved capabil
 - 1–2 neutral examples showing comparable quality (`highlight_class: "neutral"`)
 - Optionally 1 honest regression if one exists (`highlight_class: "negative"`) — this builds trust
 
-For **vision models**: collect the image URL/path alongside the prompt and set `"type": "image"`.
+For **vision models**: extract the image, convert it to a Base64 data URI string (e.g. `data:image/png;base64,...`), and set that as `"image_url"`. This ensures the HTML file remains completely zero-dependency and locally portable without broken links.
 
 ---
 
@@ -204,11 +204,11 @@ const examples = [
 ];
 ```
 
-For **vision inputs**, use:
+For **vision inputs**, explicitly convert local testing images into Base64 data URIs so the HTML remains completely zero-dependency and offline-ready:
 ```js
 {
     "type": "image",
-    "image_url": "https://example.com/image.jpg",
+    "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD...",
     "image_caption": "A chest X-ray showing ...",
     "base_output": "I see a medical image.",
     "finetuned_output": "The chest X-ray shows a right lower lobe opacity consistent with pneumonia.",
