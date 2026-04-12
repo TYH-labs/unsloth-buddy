@@ -54,8 +54,10 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 | `templates/demo_llm_dark.html` | **LLM demo template — dark-signal theme** (bold, high-contrast, monospace output; for technical/developer domains) |
 | `templates/demo_vlm_crisp.html` | **Vision demo template — crisp-light** (wide layout for images; for consumer/multimodal domains) |
 | `templates/demo_vlm_dark.html` | **Vision demo template — dark-signal** (wide layout for images; for technical/multimodal domains) |
+| `scripts/llamacpp.py` | **llama.cpp unified CLI** — install, quantize, bench, ppl, serve, chat, deploy (one-command auto-pipeline) |
+| `templates/chat_ui.html` | **Gaslamp Chat WebUI** — dark glassmorphism chat interface for local GGUF inference via llama-server |
 
-## The 7-Phase End-to-End Lifecycle
+## The 7-Phase End-to-End Lifecycle (+Deploy)
 
 As an automatic AI development tool, you must guide the user through a complete end-to-end training process. Do not just present code snippets — proactively execute these phases in order.
 
@@ -357,6 +359,41 @@ Quick summary of what the sub-skill does:
 Ask the user their deployment target. Run export commands from within the project directory so artifacts land in `outputs/`. Update `progress_log.md` when complete.
 
 **→ After Phase 6: update `gaslamp.md`** section 10 (Export — format, why, output path, run command). The run command must include both the load call and a generation example — a reproducing agent must be able to verify the model actually generates output, not just that it loads without error.
+
+### Phase 6.5: Local Deploy & Test (Optional — requires llama.cpp)
+
+If llama.cpp is installed (detected in Phase 3 via `detect_system.py`), offer the user a one-command deploy after GGUF export:
+
+> *"GGUF export is ready. Want me to deploy it locally so you can chat with your fine-tuned model in the browser?"*
+
+If yes, run the auto-deploy pipeline:
+```bash
+python scripts/llamacpp.py deploy \
+  --model outputs/model-f16.gguf \
+  --quant q4_k_m --bench --serve
+```
+
+This single command:
+1. **Quantizes** the f16 GGUF to the requested quant level(s)
+2. **Benchmarks** inference speed (tokens/sec) and prints a comparison table
+3. **Starts** an OpenAI-compatible server (`llama-server`) on port 8081
+4. **Opens** the Gaslamp Chat WebUI (`templates/chat_ui.html`) in the browser
+
+The user is chatting with their fine-tuned model within ~60 seconds of saying "yes".
+
+Individual subcommands also available for advanced users:
+```bash
+python scripts/llamacpp.py install              # install llama.cpp
+python scripts/llamacpp.py quantize --input model.gguf --types q4_k_m q8_0
+python scripts/llamacpp.py bench --models model-q4_k_m.gguf model-q8_0.gguf
+python scripts/llamacpp.py ppl --model model-q4_k_m.gguf --file eval.txt
+python scripts/llamacpp.py serve --model model-q4_k_m.gguf --port 8081
+python scripts/llamacpp.py chat --model model-q4_k_m.gguf
+```
+
+If llama.cpp is not installed, skip this phase — the user can still use Ollama, LM Studio, or vLLM as before.
+
+**→ After Phase 6.5: update `gaslamp.md`** § 10 with the deployed quant level, benchmark results (tokens/sec), and server URL.
 
 ---
 
@@ -966,6 +1003,21 @@ vllm serve ./model --dtype auto
 ```bash
 python -m sglang.launch_server --model-path ./model
 ```
+
+### 8. Deploy with llama.cpp (Local GGUF Inference + Chat UI)
+If llama.cpp is installed, use the unified CLI for one-command deploy:
+```bash
+# Auto-pipeline: quantize → benchmark → serve → open chat UI
+python scripts/llamacpp.py deploy \
+  --model outputs/model-f16.gguf \
+  --quant q4_k_m --bench --serve
+
+# Or individual steps:
+python scripts/llamacpp.py serve --model outputs/model-q4_k_m.gguf --port 8081
+python scripts/llamacpp.py chat --model outputs/model-q4_k_m.gguf
+```
+
+The `deploy` command also opens `templates/chat_ui.html`, a Gaslamp-styled chat WebUI that connects to the local `llama-server` API.
 
 ---
 

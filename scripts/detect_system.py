@@ -102,6 +102,19 @@ conda_envs = run("conda env list 2>/dev/null | grep -v '#'").splitlines() if pkg
 hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
 hf_cache_exists = hf_cache.exists()
 
+# ── llama.cpp detection ──────────────────────────────────────────────────────
+llamacpp_bins = {}
+for _bin in ["llama-cli", "llama-server", "llama-quantize", "llama-perplexity", "llama-bench"]:
+    _path = shutil.which(_bin)
+    if _path:
+        llamacpp_bins[_bin] = _path
+llamacpp_installed = len(llamacpp_bins) > 0
+llamacpp_version = ""
+if "llama-cli" in llamacpp_bins:
+    _ver_out = run(f"{llamacpp_bins['llama-cli']} --version 2>&1")
+    if _ver_out:
+        llamacpp_version = _ver_out.splitlines()[0].strip()
+
 # ── Decision logic ────────────────────────────────────────────────────────────
 if is_apple_silicon:
     install_path = "C"   # mlx-tune
@@ -131,6 +144,10 @@ print(f"Available      : {py_versions}")
 print(f"\nPackage managers: { {k: bool(v) for k, v in pkg_managers.items()} }")
 print(f"Existing venvs  : {existing_envs or 'none'}")
 print(f"HF cache exists : {hf_cache_exists} ({hf_cache})")
+if llamacpp_installed:
+    print(f"llama.cpp       : {llamacpp_version or 'installed'} ({len(llamacpp_bins)} binaries)")
+else:
+    print(f"llama.cpp       : not installed (optional — run: python {__file__.replace('detect_system.py', 'llamacpp.py')} install)")
 print(f"\n→ Recommended install path : {install_path}")
 print(f"→ Recommended Python       : {recommended_python}")
 
@@ -163,6 +180,11 @@ summary = {
     "pkg_managers": {k: bool(v) for k, v in pkg_managers.items()},
     "existing_envs": existing_envs,
     "hf_cache_exists": hf_cache_exists,
+    "llama_cpp": {
+        "installed": llamacpp_installed,
+        "version": llamacpp_version,
+        "binaries": llamacpp_bins,
+    },
     "install_path": install_path,
     "recommended_python": recommended_python,
 }
