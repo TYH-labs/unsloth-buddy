@@ -263,6 +263,11 @@ def cmd_serve(args):
         print("🛑  Stopped llama-server")
         return
 
+    if not args.model:
+        print("❌  --model is required to start the server.")
+        print(f"    Run:  python {__file__} serve --model path/to/model.gguf")
+        sys.exit(1)
+
     if not os.path.isfile(args.model):
         print(f"❌  Model not found: {args.model}")
         sys.exit(1)

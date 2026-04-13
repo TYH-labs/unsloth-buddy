@@ -36,7 +36,8 @@
         "./scripts/demo_server.py",
         "./scripts/search_design.py",
         "./scripts/colab_training.py",
-        "./scripts/setup_colab.py"
+        "./scripts/setup_colab.py",
+        "./scripts/llamacpp.py"
       ],
       "templates": [
         "./templates/gaslamp_template.md",
@@ -45,7 +46,8 @@
         "./templates/demo_llm_crisp.html",
         "./templates/demo_llm_dark.html",
         "./templates/demo_vlm_crisp.html",
-        "./templates/demo_vlm_dark.html"
+        "./templates/demo_vlm_dark.html",
+        "./templates/chat_ui.html"
       ],
       "agents": [
         "./AGENTS.md"

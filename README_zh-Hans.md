@@ -10,6 +10,7 @@
   <a href="#openclaw"><img src="https://img.shields.io/badge/%F0%9F%A6%9E%20OpenClaw-Compatible-ff4444" alt="OpenClaw Compatible" /></a>
   <a href="#快速开始"><img src="https://img.shields.io/badge/%F0%9F%A4%96%20Agent-Claude%20Code%20%2F%20Codex%20%2F%20Gemini-8b5cf6" alt="Agent Compatible" /></a>
   <a href="https://discord.gg/mZe4mbCQ6a"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="#本地部署"><img src="https://img.shields.io/badge/后端-Unsloth%20%7C%20MLX%20%7C%20llama.cpp-00b4d8" alt="后端：Unsloth / MLX / llama.cpp" /></a>
 </p>
 
 <p align="center"><code>/unsloth-buddy 我有 500 份医患问诊记录，想训练一个能自动摘要的模型，我只有一台 MacBook Air</code></p>
@@ -120,6 +121,7 @@ git clone https://github.com/TYH-labs/unsloth-buddy.git .agents/skills/unsloth-b
 | **5. 评估** | 批量测试、交互式 REPL、基础模型对比微调模型 | `logs/eval.log` |
 | **5.5. 演示** | 生成可分享的静态 HTML 页面 — 基础模型 vs 微调模型并排展示 | `demos/<name>/index.html` |
 | **6. 导出** | GGUF、合并 16-bit 或 Hub 推送 | `outputs/` |
+| **6.5. 本地部署** | 可选：量化 → 基准测试 → 启动服务 + Gaslamp Chat WebUI（需要 llama.cpp）| `outputs/*.gguf` |
 
 ```
 customer_faq_sft_2026_03_17/
@@ -186,6 +188,29 @@ Unsloth 相比标准 HuggingFace 训练速度快约 2 倍，VRAM 使用量减少
 
 ---
 
+## 本地部署
+
+GGUF 导出完成后，如果系统中检测到 llama.cpp（在第 3 阶段检测），Agent 会提供一键本地部署：
+
+```bash
+python scripts/llamacpp.py deploy \
+    --model outputs/model-f16.gguf --quant q4_k_m --bench --serve
+```
+
+将运行完整流水线：量化 → 基准测试 → 启动 OpenAI 兼容服务器 → 在浏览器中打开 Gaslamp Chat WebUI（`http://localhost:8081/`）。也可单独使用各子命令：
+
+```bash
+python scripts/llamacpp.py install              # 安装 llama.cpp（brew / cmake）
+python scripts/llamacpp.py quantize --input model.gguf --types q4_k_m q8_0
+python scripts/llamacpp.py bench --models model-q4_k_m.gguf
+python scripts/llamacpp.py serve --model model-q4_k_m.gguf --port 8081
+python scripts/llamacpp.py chat --model model-q4_k_m.gguf
+```
+
+需要安装 [llama.cpp](https://github.com/ggml-org/llama.cpp) — 可通过 `llamacpp.py install` 自动安装。
+
+---
+
 ## Google Colab 云端训练
 
 Apple Silicon 用户如需更大的模型或 CUDA 专属功能，可将训练卸载到免费 Colab GPU：
@@ -230,6 +255,7 @@ Apple Silicon 用户如需更大的模型或 CUDA 专属功能，可将训练卸
 
 ## 更新日志
 
+- **2026-04-12** — 新增 **llama.cpp 本地部署**（第 6.5 阶段）：GGUF 导出完成后，若检测到 llama.cpp，Agent 将提供一键流水线 — 量化 → 基准测试 → 启动服务 + 打开 Gaslamp Chat WebUI（`templates/chat_ui.html`）。`scripts/llamacpp.py` 提供 7 个子命令（`install`、`quantize`、`bench`、`ppl`、`serve`、`chat`、`deploy`），在 Apple Silicon（Metal）和 NVIDIA 上自动启用 GPU 卸载。`scripts/detect_system.py` 现在也会检测 llama.cpp 二进制文件，若未安装则输出提示命令。
 - **2026-04-10** — 新增 Apple Silicon 原生**视觉 SFT 支持**：集成 [mlx-vlm](https://github.com/Blaizzy/mlx-vlm) 以支持在 M 系列芯片上进行多模态微调（如 Gemma 4 Vision、Qwen2.5-VL）。新增 `scripts/unsloth_mlx_vision_example.py` 训练模板和 `mlx_eval_vision_template.py` 视觉对比评估脚本。演示生成器现已支持宽屏 VLM 布局（`vlm-crisp`、`vlm-dark`）及 PNG 资源本地打包，确保多模态演示看板的离线可用性。
 - **2026-04-09** — 演示生成器改进：自动将概念/电影类关键词（如 "matrix" → nvidia，"star wars" → spacex）解析并映射至最匹配的品牌；区分浅层与深层 DESIGN.md 覆盖 —— 深层覆盖（如全黑或局部大面积结构性分割布局）将跳过 CSS 注入点，从头开始写入演示文件。将 `scripts/search_design.py` 补充至技能脚本汇总，即使环境内无 `npx` 也可直接获取品牌设计模板。
 - **2026-04-04** — 新增演示生成器（第 5.5 阶段）：评估完成后生成静态 HTML 演示页面，并排展示基础模型与微调模型输出。内置两套主题（crisp-light、dark-signal），支持基于领域的自动强调色。无需服务器 — 在任意浏览器中直接打开。属于 [Gaslamp](https://gaslamp.dev/) 展示工具的简化版本。访谈从 5 点合同简化为 2 个问题（任务 + 数据），同时捕获用户领域/受众以用于演示主题选择。

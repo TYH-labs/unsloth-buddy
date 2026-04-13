@@ -10,6 +10,7 @@
   <a href="#openclaw"><img src="https://img.shields.io/badge/%F0%9F%A6%9E%20OpenClaw-Compatible-ff4444" alt="OpenClaw Compatible" /></a>
   <a href="#quick-start"><img src="https://img.shields.io/badge/%F0%9F%A4%96%20Agent-Claude%20Code%20%2F%20Codex%20%2F%20Gemini-8b5cf6" alt="Agent Compatible" /></a>
   <a href="https://discord.gg/mZe4mbCQ6a"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="#local-deploy"><img src="https://img.shields.io/badge/Backend-Unsloth%20%7C%20MLX%20%7C%20llama.cpp-00b4d8" alt="Backend: Unsloth / MLX / llama.cpp" /></a>
 </p>
 
 <p align="center"><code>/unsloth-buddy I have 500 customer support Q&As and want to fine-tune a summarization model. I only have a MacBook Air.</code></p>
@@ -120,6 +121,7 @@ Seven phases, each scoped to an isolated dated project directory that never touc
 | **5. Evaluation** | Batch tests, interactive REPL, base vs fine-tuned comparison | `logs/eval.log` |
 | **5.5. Demo** | Generates a shareable static HTML page — base vs fine-tuned side-by-side | `demos/<name>/index.html` |
 | **6. Export** | GGUF, merged 16-bit, or Hub push | `outputs/` |
+| **6.5. Local Deploy** | Optional: quantize → bench → serve + Gaslamp Chat WebUI (requires llama.cpp) | `outputs/*.gguf` |
 
 ```
 customer_faq_sft_2026_03_17/
@@ -186,6 +188,29 @@ The accent color is auto-selected based on your model's domain (e.g. teal for he
 
 ---
 
+## Local Deploy
+
+After GGUF export, if llama.cpp is detected on your system (checked in Phase 3), the agent offers a one-command local deploy:
+
+```bash
+python scripts/llamacpp.py deploy \
+    --model outputs/model-f16.gguf --quant q4_k_m --bench --serve
+```
+
+This runs the full pipeline: quantize → benchmark → start an OpenAI-compatible server → open the Gaslamp Chat WebUI at `http://localhost:8081/`. Individual subcommands are also available:
+
+```bash
+python scripts/llamacpp.py install              # install llama.cpp (brew / cmake)
+python scripts/llamacpp.py quantize --input model.gguf --types q4_k_m q8_0
+python scripts/llamacpp.py bench --models model-q4_k_m.gguf
+python scripts/llamacpp.py serve --model model-q4_k_m.gguf --port 8081
+python scripts/llamacpp.py chat --model model-q4_k_m.gguf
+```
+
+Requires [llama.cpp](https://github.com/ggml-org/llama.cpp) — installed automatically via `llamacpp.py install`.
+
+---
+
 ## Google Colab Training
 
 Apple Silicon users who need larger models or CUDA-only features can offload training to a free Colab GPU:
@@ -230,6 +255,7 @@ For Claude Code, Gemini CLI, Codex, or any ACP-compatible agent: provide `AGENTS
 
 ## Changelog
 
+- **2026-04-12** — Added **llama.cpp local deploy** (Phase 6.5): after GGUF export, if llama.cpp is installed, the agent offers a one-command pipeline — quantize → benchmark → serve + open the Gaslamp Chat WebUI (`templates/chat_ui.html`). `scripts/llamacpp.py` provides 7 subcommands (`install`, `quantize`, `bench`, `ppl`, `serve`, `chat`, `deploy`); auto-selects GPU offload on Apple Silicon (Metal) and NVIDIA. `scripts/detect_system.py` now detects llama.cpp binaries and prints an install hint if missing.
 - **2026-04-10** — Added native **Vision SFT for Apple Silicon**: Integrated [mlx-vlm](https://github.com/Blaizzy/mlx-vlm) to support multimodal fine-tuning (e.g. Gemma 4 Vision, Qwen2.5-VL) on M-series chips. Added `scripts/unsloth_mlx_vision_example.py` training template and `mlx_eval_vision_template.py` for comparative vision evaluation. Demo Builder now supports wide-format VLM layouts (`vlm-crisp`, `vlm-dark`) and relative PNG asset packaging for offline-portable multimodal dashboards.
 - **2026-04-09** — Demo Builder improvements: auto-resolves conceptual/movie keywords (e.g. "matrix" → nvidia, "star wars" → spacex) to the best-fit brand before calling the design search script; distinguishes shallow vs. deep DESIGN.md overrides — deep overrides (structural layout changes like all-black or hero/light-content split) skip the CSS injection point and write the demo file from scratch. Added `scripts/search_design.py` to skill resources for fetching brand design templates without `npx`.
 - **2026-04-04** — Added Demo Builder (Phase 5.5): after evaluation, generates a static HTML demo page showing base vs fine-tuned outputs side-by-side. Two themes (crisp-light, dark-signal) with automatic domain-specific accent colors. No server needed — open the file in any browser. Part of the [Gaslamp](https://gaslamp.dev/) presentation toolkit, simplified for unsloth-buddy. Interview simplified from 5-point contract to 2-question format (task + data) that also captures user domain/audience for demo theming.
