@@ -35,6 +35,8 @@ templates/demo_llm_crisp.html  ← LLM demo template, crisp-light theme (busines
 templates/demo_llm_dark.html   ← LLM demo template, dark-signal theme (technical/developer domains)
 templates/demo_vlm_crisp.html  ← Vision demo template, crisp-light theme (multimodal domains)
 templates/demo_vlm_dark.html   ← Vision demo template, dark-signal theme (technical multimodal)
+scripts/llamacpp.py            ← llama.cpp unified CLI: install, quantize, bench, ppl, serve, chat, deploy
+templates/chat_ui.html         ← Gaslamp Chat WebUI for local GGUF inference via llama-server
 ```
 
 ## Lifecycle (7 Phases + Demo)
@@ -49,6 +51,7 @@ templates/demo_vlm_dark.html   ← Vision demo template, dark-signal theme (tech
 | 5. Eval | Run eval against base and fine-tuned model — both batch and `--compare` mode |
 | 5.5. Demo | Ask user if they want a shareable demo; read `sub-skills/demo_builder.md`; write `demos/<name>/index.html` |
 | 6. Export | Convert to GGUF / merge / push to HF Hub per user's deploy target |
+| 6.5. Deploy | Optional: `llamacpp.py deploy` → quantize + bench + serve + chat UI (requires llama.cpp) |
 
 Everything is scoped to the dated project directory. Nothing touches the repo root.
 

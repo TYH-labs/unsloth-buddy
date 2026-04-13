@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gaslamp Chat</title>
+<style>
+:root {
+  --bg-main: #0b0e14;
+  --bg-card: rgba(18, 22, 30, 0.85);
+  --bg-input: rgba(24, 30, 42, 0.9);
+  --bg-user: linear-gradient(135deg, #1a3a5c, #1e4d6e);
+  --bg-assist: rgba(30, 36, 48, 0.9);
+  --accent: #4fc3f7;
+  --accent-dim: rgba(79, 195, 247, 0.15);
+  --text: #e4e8f0;
+  --text-dim: #8892a4;
+  --text-code: #a5d6a7;
+  --border: rgba(79, 195, 247, 0.12);
+  --border-focus: rgba(79, 195, 247, 0.4);
+  --shadow: 0 8px 32px rgba(0,0,0,0.45);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg-main);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ─────────────────────────────── */
+.header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 10;
+}
+
+.header .logo {
+  font-size: 18px;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--accent), #81d4fa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.header .model-info {
+  font-size: 13px;
+  color: var(--text-dim);
+  flex: 1;
+}
+
+.header .model-info .model-name {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.header .settings-btn {
+  background: var(--accent-dim);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.header .settings-btn:hover {
+  background: rgba(79, 195, 247, 0.25);
+  border-color: var(--border-focus);
+}
+
+/* ── Settings Panel ─────────────────────── */
+.settings-panel {
+  display: none;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  padding: 16px 24px;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.settings-panel.open { display: flex; }
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.setting-group label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+
+.setting-group input[type="range"] {
+  accent-color: var(--accent);
+  width: 100%;
+}
+
+.setting-group .val { font-size: 12px; color: var(--accent); }
+
+.setting-group textarea {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px;
+  resize: vertical;
+  min-height: 48px;
+  width: 300px;
+}
+
+.setting-group textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+/* ── Chat Area ──────────────────────────── */
+.chat-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scroll-behavior: smooth;
+}
+
+.msg {
+  max-width: 75%;
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  line-height: 1.6;
+  font-size: 14px;
+  animation: fadeUp 0.25s ease-out;
+  word-wrap: break-word;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.msg.user {
+  background: var(--bg-user);
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 2px 12px rgba(26, 58, 92, 0.4);
+}
+
+.msg.assistant {
+  background: var(--bg-assist);
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.msg pre {
+  background: rgba(0,0,0,0.35);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-code);
+  margin: 8px 0;
+}
+
+.msg code {
+  background: rgba(0,0,0,0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-code);
+}
+
+.msg .typing {
+  display: inline-block;
+  width: 6px;
+  height: 16px;
+  background: var(--accent);
+  animation: blink 0.8s steps(2) infinite;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+.msg strong { color: #e0e0e0; }
+.msg em { color: #b0bec5; }
+.msg ul, .msg ol { margin-left: 20px; margin-top: 4px; }
+
+/* ── Input Bar ──────────────────────────── */
+.input-bar {
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  padding: 16px 24px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.input-bar textarea {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 12px 16px;
+  resize: none;
+  min-height: 46px;
+  max-height: 160px;
+  transition: border-color 0.2s;
+}
+
+.input-bar textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.08);
+}
+
+.input-bar button {
+  background: linear-gradient(135deg, #2196f3, #4fc3f7);
+  border: none;
+  color: #fff;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 20px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.input-bar button:hover { transform: scale(1.08); box-shadow: 0 4px 16px rgba(33,150,243,0.4); }
+.input-bar button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ── Status Bar ─────────────────────────── */
+.status-bar {
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  padding: 6px 24px;
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  justify-content: space-between;
+}
+
+.status-bar .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.status-bar .dot.connected { background: #66bb6a; }
+.status-bar .dot.disconnected { background: #ef5350; }
+.status-bar .dot.connecting { background: #ffa726; animation: blink 1s infinite; }
+
+/* ── Responsive ─────────────────────────── */
+@media (max-width: 600px) {
+  .msg { max-width: 90%; }
+  .header { padding: 10px 16px; }
+  .input-bar { padding: 12px 16px; }
+  .chat-area { padding: 16px; }
+  .setting-group textarea { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <span class="logo">⚡ Gaslamp Chat</span>
+  <span class="model-info">
+    <span class="model-name" id="modelName">Connecting…</span>
+    <span id="modelMeta"></span>
+  </span>
+  <button class="settings-btn" id="settingsToggle">⚙ Settings</button>
+  <button class="settings-btn" id="exportBtn" title="Export conversation">📋 Export</button>
+</div>
+
+<!-- Settings Panel -->
+<div class="settings-panel" id="settingsPanel">
+  <div class="setting-group">
+    <label>System Prompt</label>
+    <textarea id="systemPrompt" placeholder="You are a helpful assistant.">You are a helpful assistant.</textarea>
+  </div>
+  <div class="setting-group">
+    <label>Temperature <span class="val" id="tempVal">0.7</span></label>
+    <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7">
+  </div>
+  <div class="setting-group">
+    <label>Max Tokens <span class="val" id="maxTokVal">1024</span></label>
+    <input type="range" id="maxTokens" min="64" max="4096" step="64" value="1024">
+  </div>
+  <div class="setting-group">
+    <label>Top-P <span class="val" id="topPVal">0.9</span></label>
+    <input type="range" id="topP" min="0" max="1" step="0.05" value="0.9">
+  </div>
+  <div class="setting-group">
+    <label>Server Port <span class="val" id="portVal">8081</span></label>
+    <input type="range" id="serverPort" min="8000" max="9000" step="1" value="8081">
+  </div>
+</div>
+
+<!-- Chat Area -->
+<div class="chat-area" id="chatArea">
+  <div class="msg assistant">
+    👋 Ready to chat! Configure the server port in Settings if needed, then type below to start.
+  </div>
+</div>
+
+<!-- Input Bar -->
+<div class="input-bar">
+  <textarea id="userInput" placeholder="Type a message… (Shift+Enter for newline)" rows="1"></textarea>
+  <button id="sendBtn" title="Send">↑</button>
+</div>
+
+<!-- Status Bar -->
+<div class="status-bar">
+  <span><span class="dot connecting" id="statusDot"></span><span id="statusText">Connecting…</span></span>
+  <span id="tokenCount"></span>
+</div>
+
+<script>
+// ── State ──
+const state = {
+  messages: [],
+  streaming: false,
+  totalTokens: 0,
+};
+
+// ── DOM ──
+const chatArea     = document.getElementById('chatArea');
+const userInput    = document.getElementById('userInput');
+const sendBtn      = document.getElementById('sendBtn');
+const statusDot    = document.getElementById('statusDot');
+const statusText   = document.getElementById('statusText');
+const tokenCount   = document.getElementById('tokenCount');
+const modelName    = document.getElementById('modelName');
+const modelMeta    = document.getElementById('modelMeta');
+const settingsToggle = document.getElementById('settingsToggle');
+const settingsPanel  = document.getElementById('settingsPanel');
+const exportBtn    = document.getElementById('exportBtn');
+
+const tempSlider   = document.getElementById('temperature');
+const tempVal      = document.getElementById('tempVal');
+const maxTokSlider = document.getElementById('maxTokens');
+const maxTokVal    = document.getElementById('maxTokVal');
+const topPSlider   = document.getElementById('topP');
+const topPVal      = document.getElementById('topPVal');
+const portSlider   = document.getElementById('serverPort');
+const portVal      = document.getElementById('portVal');
+const systemPrompt = document.getElementById('systemPrompt');
+
+// ── Read port from URL params ──
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.has('port')) {
+  portSlider.value = urlParams.get('port');
+  portVal.textContent = portSlider.value;
+}
+
+function getBaseUrl() { return `http://localhost:${portSlider.value}`; }
+
+// ── Settings Wiring ──
+settingsToggle.onclick = () => settingsPanel.classList.toggle('open');
+tempSlider.oninput   = () => { tempVal.textContent = tempSlider.value; };
+maxTokSlider.oninput = () => { maxTokVal.textContent = maxTokSlider.value; };
+topPSlider.oninput   = () => { topPVal.textContent = topPSlider.value; };
+portSlider.oninput   = () => { portVal.textContent = portSlider.value; checkConnection(); };
+
+// ── Export ──
+exportBtn.onclick = () => {
+  const data = JSON.stringify(state.messages, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chat_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// ── Connection Check ──
+async function checkConnection() {
+  try {
+    const r = await fetch(`${getBaseUrl()}/v1/models`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      const d = await r.json();
+      const m = d.data?.[0];
+      statusDot.className = 'dot connected';
+      statusText.textContent = 'Connected';
+      if (m) {
+        modelName.textContent = m.id || 'Model loaded';
+        modelMeta.textContent = '';
+      }
+    } else { throw new Error(); }
+  } catch {
+    statusDot.className = 'dot disconnected';
+    statusText.textContent = 'Disconnected — check server port in Settings';
+    modelName.textContent = 'Not connected';
+  }
+}
+
+// ── Minimal Markdown ──
+function renderMd(text) {
+  let html = text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+  return html;
+}
+
+// ── Add message bubble ──
+function addBubble(role, content, streaming = false) {
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = renderMd(content) + (streaming ? '<span class="typing"></span>' : '');
+  chatArea.appendChild(div);
+  chatArea.scrollTop = chatArea.scrollHeight;
+  return div;
+}
+
+function updateBubble(div, content, done = false) {
+  div.innerHTML = renderMd(content) + (done ? '' : '<span class="typing"></span>');
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+// ── Send Message ──
+async function sendMessage() {
+  const text = userInput.value.trim();
+  if (!text || state.streaming) return;
+
+  state.messages.push({ role: 'user', content: text });
+  addBubble('user', text);
+  userInput.value = '';
+  userInput.style.height = 'auto';
+  sendBtn.disabled = true;
+  state.streaming = true;
+
+  // Build messages array with system prompt
+  const msgs = [];
+  const sys = systemPrompt.value.trim();
+  if (sys) msgs.push({ role: 'system', content: sys });
+  msgs.push(...state.messages);
+
+  const assistBubble = addBubble('assistant', '', true);
+  let assistContent = '';
+
+  try {
+    const resp = await fetch(`${getBaseUrl()}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: msgs,
+        stream: true,
+        temperature: parseFloat(tempSlider.value),
+        max_tokens: parseInt(maxTokSlider.value),
+        top_p: parseFloat(topPSlider.value),
+      }),
+    });
+
+    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+        try {
+          const chunk = JSON.parse(line.slice(6));
+          const delta = chunk.choices?.[0]?.delta?.content;
+          if (delta) {
+            assistContent += delta;
+            updateBubble(assistBubble, assistContent);
+          }
+          if (chunk.usage) {
+            state.totalTokens += (chunk.usage.total_tokens || 0);
+            tokenCount.textContent = `${state.totalTokens} tokens`;
+          }
+        } catch {}
+      }
+    }
+  } catch (err) {
+    assistContent = `⚠️ ${err.message}. Is the server running? Check Settings → Server Port.`;
+  }
+
+  updateBubble(assistBubble, assistContent || '(empty response)', true);
+  state.messages.push({ role: 'assistant', content: assistContent });
+  state.streaming = false;
+  sendBtn.disabled = false;
+  userInput.focus();
+}
+
+// ── Input Handling ──
+sendBtn.onclick = sendMessage;
+userInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+userInput.addEventListener('input', () => {
+  userInput.style.height = 'auto';
+  userInput.style.height = Math.min(userInput.scrollHeight, 160) + 'px';
+});
+
+// ── Init ──
+checkConnection();
+setInterval(checkConnection, 10000);
+userInput.focus();
+</script>
+</body>
+</html>

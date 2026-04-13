@@ -27,13 +27,15 @@
     "scripts/search_design.py",
     "scripts/colab_training.py",
     "scripts/setup_colab.py",
+    "scripts/llamacpp.py",
     "templates/gaslamp_template.md",
     "templates/dashboard.html",
     "templates/gaslamp.png",
     "templates/demo_llm_crisp.html",
     "templates/demo_llm_dark.html",
     "templates/demo_vlm_crisp.html",
-    "templates/demo_vlm_dark.html"
+    "templates/demo_vlm_dark.html",
+    "templates/chat_ui.html"
   ],
   "schemaVersion": "1.0"
 }
