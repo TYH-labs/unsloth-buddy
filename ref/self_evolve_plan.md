@@ -201,6 +201,9 @@ With `benchmarks.json` + `skills.md` recipes + the existing 7-phase lifecycle:
 
 Reference: [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) — the same pattern applied to fine-tuning hyperparameter search, scoped to the user's own hardware and model preferences.
 
+### Continuous / Inline Reflection
+Evaluate the possibility of synthesizing what the agent learns *continuously during the project* (e.g., inline reflection capturing lessons at the exact moment a workaround is applied or a hyperparameter is chosen), rather than exclusively extracting everything as a batched post-mortem in Phase 7.
+
 ---
 
 ## Design Sources
