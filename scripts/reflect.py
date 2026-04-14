@@ -265,11 +265,12 @@ def _format_lesson_entry(item: dict) -> dict:
     body_parts = [item["body"]]
     if item.get("source"):
         body_parts.append(f"Source: {item['source']}")
+    body = "\n".join(body_parts)
     return {
         "date": item.get("date", datetime.now().strftime("%Y-%m-%d")),
         "title": item["title"],
-        "body": "\n".join(body_parts),
-        "hash": _content_hash(f"{item['title']}\n{item['body']}"),
+        "body": body,
+        "hash": _content_hash(f"{item['title']}\n{body}"),
     }
 
 
