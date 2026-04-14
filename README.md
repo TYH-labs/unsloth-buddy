@@ -34,7 +34,7 @@
 
 ## What is this?
 
-A fine-tuning agent that talks like a colleague — and gets better at fine-tuning for *your* setup every time you use it. Describe your goal, and it asks the right questions, finds or formats your data, picks the right technique and model, trains on your hardware, validates the result, and packages it for deployment.
+**The self-evolving fine-tuning agent.** It talks like a colleague, learns your setup's quirks over time, and orchestrates the full lifecycle: from data formatting and model selection to training, validation, and deployment.
 
 Runs on NVIDIA GPUs via [Unsloth](https://github.com/unslothai/unsloth), natively on Apple Silicon via [mlx-tune](https://github.com/ml-explore/mlx-lm), and on free cloud GPUs via [colab-mcp](https://github.com/googlecolab/colab-mcp). Part of the [Gaslamp](https://gaslamp.dev/) AI development platform — [docs](https://gaslamp.dev/unsloth).
 
@@ -110,7 +110,7 @@ Most tools assume you already know what to do. This one doesn't — and it learn
 | **"I trained it, but does it work?"** | Runs the fine-tuned adapter alongside the base model so you can see the difference, not just a loss number |
 | **"How do I deploy it?"** | You name the target (Ollama, vLLM, HF Hub) — it runs the conversion commands |
 | **"How do I reproduce this later — or hand it off?"** | Every project gets a `gaslamp.md` roadbook: every kept decision with its rationale, plus 📖 learn blocks on the underlying ML concepts — enough for any agent or person to reproduce end-to-end |
-| **"I keep hitting the same problems on my setup"** | After each project, the agent synthesizes what it learned — workarounds, hardware quirks, what hyperparameters worked — and carries them into every future project automatically |
+| **"I keep hitting the same problems on my setup"** | **A self-evolving feedback loop:** Agent-driven memory synthesis after every run. Hardware quirks and hyperparameter workarounds accumulate over time. Frozen snapshot injection for zero-prompt cross-project recall. |
 
 ---
 
