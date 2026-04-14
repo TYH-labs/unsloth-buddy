@@ -34,18 +34,20 @@
 
 ## What is this?
 
-A fine-tuning agent that talks like a colleague. Describe your goal, and it asks the right questions, finds or formats your data, picks the right technique and model, trains on your hardware, validates the result, and packages it for deployment.
+A fine-tuning agent that talks like a colleague — and gets better at fine-tuning for *your* setup every time you use it. Describe your goal, and it asks the right questions, finds or formats your data, picks the right technique and model, trains on your hardware, validates the result, and packages it for deployment.
 
 Runs on NVIDIA GPUs via [Unsloth](https://github.com/unslothai/unsloth), natively on Apple Silicon via [mlx-tune](https://github.com/ml-explore/mlx-lm), and on free cloud GPUs via [colab-mcp](https://github.com/googlecolab/colab-mcp). Part of the [Gaslamp](https://gaslamp.dev/) AI development platform — [docs](https://gaslamp.dev/unsloth).
 
 ---
 
-## One sentence, one fine-tuned model.
+## One sentence, one fine-tuned model. One run, one step smarter.
 
 ```
 You: Fine-tune a small model on my customer support FAQ. I have a CSV file.
 
 [Phase 0] Creating project: customer_faq_sft_2026_03_17/
+          Injecting memory from past sessions...
+          Applied: adapter_path convention, SFT recipe for Apple Silicon, M4 profile
 [Phase 1] Requirements interview...
            Method: SFT   Model: Qwen2.5-0.5B   Deploy: Ollama
 [Phase 2] Data strategy...
@@ -61,9 +63,13 @@ You: Fine-tune a small model on my customer support FAQ. I have a CSV file.
            [Fine-tuned]  Go to the login page → click "Forgot password" → check your email.
 [Phase 6] Export → outputs/model-q4_k_m.gguf
            Run: ollama create my-faq-bot -f Modelfile && ollama run my-faq-bot
+[Phase 7] Reflecting on completed project...
+           ✓ 4 lessons → ~/.gaslamp/lessons.md  (model gotchas, install traps)
+           ✓ 1 recipe  → ~/.gaslamp/skills.md   (SFT on Apple Silicon)
+           ✓ 1 profile → ~/.gaslamp/user.md     (M4 Max, mlx-tune, Python 3.12)
 ```
 
-One conversation, seven phases, one deployable model — and a shareable demo page.
+One conversation, eight phases, one deployable model — and a smarter agent next time.
 
 ---
 
@@ -92,7 +98,7 @@ git clone https://github.com/TYH-labs/unsloth-buddy.git .agents/skills/unsloth-b
 
 ## How is it different?
 
-Most tools assume you already know what to do. This one doesn't.
+Most tools assume you already know what to do. This one doesn't — and it learns from every project you run.
 
 | Your concern | What actually happens |
 |---|---|
@@ -104,17 +110,18 @@ Most tools assume you already know what to do. This one doesn't.
 | **"I trained it, but does it work?"** | Runs the fine-tuned adapter alongside the base model so you can see the difference, not just a loss number |
 | **"How do I deploy it?"** | You name the target (Ollama, vLLM, HF Hub) — it runs the conversion commands |
 | **"How do I reproduce this later — or hand it off?"** | Every project gets a `gaslamp.md` roadbook: every kept decision with its rationale, plus 📖 learn blocks on the underlying ML concepts — enough for any agent or person to reproduce end-to-end |
+| **"I keep hitting the same problems on my setup"** | After each project, the agent synthesizes what it learned — workarounds, hardware quirks, what hyperparameters worked — and carries them into every future project automatically |
 
 ---
 
 ## How it works
 
-Seven phases, each scoped to an isolated dated project directory that never touches your repo root.
+Eight phases, each scoped to an isolated dated project directory that never touches your repo root.
 
 | Phase | What happens | Output files |
 |---|---|---|
-| **0. Init** | Creates `{name}_{date}/` with standard directory structure | `gaslamp.md`, `progress_log.md` |
-| **1. Interview** | 2-question interview — task + data; captures domain/audience | `project_brief.md` |
+| **0. Init** | Creates `{name}_{date}/`, injects long-term memory snapshot from past sessions | `gaslamp.md`, `.gaslamp_context/` |
+| **1. Interview** | 2-question interview — task + data; captures domain/audience; silently applies past lessons | `project_brief.md` |
 | **2. Data** | Acquires, validates, and formats to trainer schema | `data_strategy.md` |
 | **3. Environment** | Hardware scan → Python env check → blocks until ready | `detect_env_result.json` |
 | **4. Training** | Generates and runs `train.py`, streams output to log | `outputs/adapters/` |
@@ -122,6 +129,7 @@ Seven phases, each scoped to an isolated dated project directory that never touc
 | **5.5. Demo** | Generates a shareable static HTML page — base vs fine-tuned side-by-side | `demos/<name>/index.html` |
 | **6. Export** | GGUF, merged 16-bit, or Hub push | `outputs/` |
 | **6.5. Local Deploy** | Optional: quantize → bench → serve + Gaslamp Chat WebUI (requires llama.cpp) | `outputs/*.gguf` |
+| **7. Reflect** | Synthesizes lessons, gotchas, and recipes into `~/.gaslamp/` for future projects | `~/.gaslamp/` |
 
 ```
 customer_faq_sft_2026_03_17/
@@ -131,6 +139,7 @@ customer_faq_sft_2026_03_17/
 ├── gaslamp.md            ← reproducibility roadbook
 ├── project_brief.md      data_strategy.md
 ├── memory.md             progress_log.md
+└── .gaslamp_context/     ← read-only snapshot of long-term memory (local only)
 ```
 
 ---
@@ -253,8 +262,19 @@ For Claude Code, Gemini CLI, Codex, or any ACP-compatible agent: provide `AGENTS
 
 ---
 
+## Gets smarter with every project
+
+After each fine-tuning run, unsloth-buddy synthesizes what it learned — the workarounds, the hardware-specific settings, the hyperparameters that worked — and carries that knowledge into future projects automatically.
+
+The second time you fine-tune on Apple Silicon, it already knows your adapter path convention. The third time you work with Gemma models, it already sets `padding_side` correctly. You stop repeating the same debugging sessions. The agent improves for *your* setup, not for some statistical average user.
+
+This works through a local `~/.gaslamp/` memory directory (never committed to your repo). Past lessons, model-specific quirks, and reusable scenario recipes accumulate there. Every new project injects a frozen snapshot at startup — silently, with no prompts — and applies anything relevant.
+
+---
+
 ## Changelog
 
+- **2026-04-14** — **Self-evolving memory** (Phase 7 + global inject): after each project, the agent synthesizes lessons, model-specific gotchas, and reusable scenario recipes into `~/.gaslamp/`. Every new project injects a frozen snapshot at startup and silently applies past knowledge. Implements the Frozen Snapshot pattern from agent memory research. See `ref/self_evolve_plan.md`.
 - **2026-04-12** — Added **llama.cpp local deploy** (Phase 6.5): after GGUF export, if llama.cpp is installed, the agent offers a one-command pipeline — quantize → benchmark → serve + open the Gaslamp Chat WebUI (`templates/chat_ui.html`). `scripts/llamacpp.py` provides 7 subcommands (`install`, `quantize`, `bench`, `ppl`, `serve`, `chat`, `deploy`); auto-selects GPU offload on Apple Silicon (Metal) and NVIDIA. `scripts/detect_system.py` now detects llama.cpp binaries and prints an install hint if missing.
 - **2026-04-10** — Added native **Vision SFT for Apple Silicon**: Integrated [mlx-vlm](https://github.com/Blaizzy/mlx-vlm) to support multimodal fine-tuning (e.g. Gemma 4 Vision, Qwen2.5-VL) on M-series chips. Added `scripts/unsloth_mlx_vision_example.py` training template and `mlx_eval_vision_template.py` for comparative vision evaluation. Demo Builder now supports wide-format VLM layouts (`vlm-crisp`, `vlm-dark`) and relative PNG asset packaging for offline-portable multimodal dashboards.
 - **2026-04-09** — Demo Builder improvements: auto-resolves conceptual/movie keywords (e.g. "matrix" → nvidia, "star wars" → spacex) to the best-fit brand before calling the design search script; distinguishes shallow vs. deep DESIGN.md overrides — deep overrides (structural layout changes like all-black or hero/light-content split) skip the CSS injection point and write the demo file from scratch. Added `scripts/search_design.py` to skill resources for fetching brand design templates without `npx`.

@@ -34,18 +34,20 @@
 
 ## 這是什麼？
 
-一個像同事一樣對話的微調 Agent。描述你的需求，它會提出合適的問題、找到或整理你的資料、選擇合適的技術和模型、在你的硬體上訓練、驗證效果，並打包部署。
+一個像同事一樣對話的微調 Agent —— 而且每次使用後都會對*你的*環境更加熟悉。描述你的需求，它會提出合適的問題、找到或整理你的資料、選擇合適的技術和模型、在你的硬體上訓練、驗證效果，並打包部署。
 
 支援透過 [Unsloth](https://github.com/unslothai/unsloth) 在 NVIDIA GPU 上執行，也支援透過 [mlx-tune](https://github.com/ml-explore/mlx-lm) 在 Apple Silicon 上原生執行。隸屬於 [Gaslamp](https://gaslamp.dev/) AI 開發平台 — [文件](https://gaslamp.dev/unsloth)。
 
 ---
 
-## 一句話，一個微調模型。
+## 一句話，一個微調模型。每次執行，更進一步。
 
 ```
 你：在我的客戶支援 FAQ 上微調一個小模型，我有一個 CSV 檔案。
 
 [第 0 階段] 建立專案：customer_faq_sft_2026_03_17/
+          注入歷史會話記憶...
+          已套用：adapter_path 規範、Apple Silicon SFT 配方、M4 配置
 [第 1 階段] 需求訪談...
            方法：SFT   模型：Qwen2.5-0.5B   部署：Ollama
 [第 2 階段] 資料策略...
@@ -61,9 +63,13 @@
            [微調]  前往登入頁面 → 點擊「忘記密碼」→ 查看電子郵件。
 [第 6 階段] 匯出 → outputs/model-q4_k_m.gguf
            執行：ollama create my-faq-bot -f Modelfile && ollama run my-faq-bot
+[第 7 階段] 反思已完成的專案...
+           ✓ 4 條經驗 → ~/.gaslamp/lessons.md  （模型注意事項、安裝陷阱）
+           ✓ 1 個配方 → ~/.gaslamp/skills.md   （Apple Silicon SFT）
+           ✓ 1 份配置 → ~/.gaslamp/user.md     （M4 Max、mlx-tune、Python 3.12）
 ```
 
-一次對話，七個階段，最終得到一個可部署的模型 — 以及一個可分享的展示頁面。
+一次對話，八個階段，最終得到一個可部署的模型 — 下次 Agent 更聰明。
 
 ---
 
@@ -92,7 +98,7 @@ git clone https://github.com/TYH-labs/unsloth-buddy.git .agents/skills/unsloth-b
 
 ## 有何不同？
 
-大多數工具假設你已經知道該怎麼做，而這個工具不會。
+大多數工具假設你已經知道該怎麼做，而這個工具不會 — 而且每次執行都會從中學習。
 
 | 你的顧慮 | 實際發生的事 |
 |---|---|
@@ -104,17 +110,18 @@ git clone https://github.com/TYH-labs/unsloth-buddy.git .agents/skills/unsloth-b
 | **「我訓練好了，但它有效嗎？」** | 將微調適配器與基礎模型並排執行，讓你看到差異，而不只是一個損失數值 |
 | **「怎麼部署？」** | 你指定目標（Ollama、vLLM、HF Hub）— 它執行轉換指令 |
 | **「之後怎麼復現，或者交給別人？」** | 每個專案都會產生一份 `gaslamp.md` 路書：記錄每個已確定的決策及其原因，並附帶 📖 學習模組說明底層 ML 概念，任何 Agent 或人員都可以端到端復現整個專案 |
+| **「我總是在自己的環境上遇到同樣的問題」** | 每次專案完成後，Agent 會提煉所學 — 變通方法、硬體特性、有效的超參數 — 並自動帶入後續的每個專案 |
 
 ---
 
 ## 運作原理
 
-七個階段，每個階段都限定在一個獨立的含日期專案目錄中，不會影響你的儲存庫根目錄。
+八個階段，每個階段都限定在一個獨立的含日期專案目錄中，不會影響你的儲存庫根目錄。
 
 | 階段 | 發生的事 | 產出檔案 |
 |---|---|---|
-| **0. 初始化** | 建立 `{name}_{date}/` 標準目錄結構 | `gaslamp.md`、`progress_log.md` |
-| **1. 訪談** | 2 個問題的訪談 — 任務 + 資料；擷取領域/受眾 | `project_brief.md` |
+| **0. 初始化** | 建立 `{name}_{date}/`，注入歷史會話的長期記憶快照 | `gaslamp.md`、`.gaslamp_context/` |
+| **1. 訪談** | 2 個問題的訪談 — 任務 + 資料；擷取領域/受眾；靜默套用歷史經驗 | `project_brief.md` |
 | **2. 資料** | 取得、驗證並格式化為訓練器 schema | `data_strategy.md` |
 | **3. 環境** | 硬體掃描 → Python 環境檢查 → 阻塞直到就緒 | `detect_env_result.json` |
 | **4. 訓練** | 生成並執行 `train.py`，串流輸出至日誌 | `outputs/adapters/` |
@@ -122,6 +129,7 @@ git clone https://github.com/TYH-labs/unsloth-buddy.git .agents/skills/unsloth-b
 | **5.5. 展示** | 產生可分享的靜態 HTML 頁面 — 基礎模型 vs 微調模型並排展示 | `demos/<name>/index.html` |
 | **6. 匯出** | GGUF、合併 16-bit 或 Hub 推送 | `outputs/` |
 | **6.5. 本地部署** | 可選：量化 → 基準測試 → 啟動服務 + Gaslamp Chat WebUI（需要 llama.cpp）| `outputs/*.gguf` |
+| **7. 反思** | 將經驗、注意事項與配方提煉至 `~/.gaslamp/`，供後續專案使用 | `~/.gaslamp/` |
 
 ```
 customer_faq_sft_2026_03_17/
@@ -131,6 +139,7 @@ customer_faq_sft_2026_03_17/
 ├── gaslamp.md            ← 可復現路書
 ├── project_brief.md      data_strategy.md
 ├── memory.md             progress_log.md
+└── .gaslamp_context/     ← 長期記憶唯讀快照（本地專屬）
 ```
 
 ---
@@ -253,8 +262,19 @@ Apple Silicon 使用者如需更大的模型或 CUDA 專屬功能，可將訓練
 
 ---
 
+## 越用越聰明
+
+每次完成微調後，unsloth-buddy 會提煉它學到的內容 — 變通方法、硬體特定設定、有效的超參數 — 並將這些知識自動帶入後續每個專案。
+
+第二次在 Apple Silicon 上微調時，它已經知道你的 adapter 路徑規範。第三次使用 Gemma 模型時，它已經會自動設定 `padding_side`。你不再需要重複相同的除錯過程。Agent 為*你的*環境持續進化，而非為某個統計平均使用者。
+
+這透過本地 `~/.gaslamp/` 記憶目錄實現（不會提交至你的程式碼儲存庫）。歷史經驗、模型特有的注意事項以及可重複使用的場景配方在此積累。每個新專案啟動時自動注入凍結快照 — 靜默執行，無需任何提示 — 並套用一切相關內容。
+
+---
+
 ## 更新日誌
 
+- **2026-04-14** — **自進化記憶**（第 7 階段 + 全域注入）：每次專案完成後，Agent 將經驗、模型特有注意事項與可重複使用場景配方提煉至 `~/.gaslamp/`。每個新專案啟動時自動注入凍結快照，靜默套用歷史知識。實現了代理記憶研究中的凍結快照模式。詳見 `ref/self_evolve_plan.md`。
 - **2026-04-12** — 新增 **llama.cpp 本地部署**（第 6.5 階段）：GGUF 匯出完成後，若偵測到 llama.cpp，Agent 將提供一鍵流水線 — 量化 → 基準測試 → 啟動服務 + 開啟 Gaslamp Chat WebUI（`templates/chat_ui.html`）。`scripts/llamacpp.py` 提供 7 個子指令（`install`、`quantize`、`bench`、`ppl`、`serve`、`chat`、`deploy`），在 Apple Silicon（Metal）和 NVIDIA 上自動啟用 GPU 卸載。`scripts/detect_system.py` 現在也會偵測 llama.cpp 二進位檔案，若未安裝則輸出提示指令。
 - **2026-04-10** — 新增 Apple Silicon 原生**視覺 SFT 支援**：整合 [mlx-vlm](https://github.com/Blaizzy/mlx-vlm) 以支援在 M 系列晶片上進行多模態微調（如 Gemma 4 Vision、Qwen2.5-VL）。新增 `scripts/unsloth_mlx_vision_example.py` 訓練範本和 `mlx_eval_vision_template.py` 視覺對比評估腳本。展示生成器現已支援寬螢幕 VLM 佈局（`vlm-crisp`、`vlm-dark`）及 PNG 資源本地打包，確保多模態展示看板的離線可用性。
 - **2026-04-09** — 展示生成器改進：在呼叫設計搜尋腳本前，自動將概念/電影類關鍵字（如 "matrix" → nvidia，"star wars" → spacex）解析並對應至最匹配的品牌；區分淺層與深層 DESIGN.md 覆蓋 —— 深層覆蓋（如全黑或局部大面積結構性分割佈局）將跳過 CSS 注入點，從頭開始寫入展示檔案。將 `scripts/search_design.py` 補充至技能資源，即使環境內無 `npx` 也可直接獲取品牌設計範本。
