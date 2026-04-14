@@ -82,7 +82,11 @@ cd "$PROJECT_DIR"
 ├── logs/               # training stdout/stderr
 ├── gaslamp.md          # roadbook: key decisions + rationale + learning warmup
 ├── memory.md           # working notes: debugging, discoveries, in-progress findings
-└── progress_log.md     # chronological session log of each phase
+├── progress_log.md     # chronological session log of each phase
+└── .gaslamp_context/   # (if ~/.gaslamp/ exists) frozen snapshot of long-term memory
+    ├── user.md         #   read-only — hardware, preferences
+    ├── lessons.md      #   read-only — cross-project gotchas
+    └── skills.md       #   read-only — scenario recipes with When: triggers
 ```
 
 **Three files, three distinct roles — never mix them:**
@@ -98,6 +102,23 @@ cd "$PROJECT_DIR"
 All subsequent commands run from inside `$PROJECT_DIR`. All paths in generated scripts (train.py, eval.py) must be relative to this directory.
 
 After creating the directory, fill in `gaslamp.md` section 1 (Goal) and `memory.md` with the known fields from the interview.
+
+#### Global Memory Injection (Frozen Snapshot)
+
+If `.gaslamp_context/` was created by `init_project.py`, read all three files **immediately** after the project directory is confirmed:
+
+1. **`user.md`** — hardware profile and preferences. Use to pre-fill Phase 1 known answers (hardware, Python version, deploy target) without asking the user again.
+2. **`lessons.md`** — isolated gotchas. Silently apply any that match the current task (e.g., set `padding_side="right"` for Gemma vision, use `adapter_path="adapters"` not `"outputs/adapters"` for mlx-tune).
+3. **`skills.md`** — scenario recipes with `When:` trigger conditions. Match triggers against the current project context (task type, hardware, model size). For matching recipes, silently apply their phase-specific steps.
+
+Record what was applied as a preamble in `gaslamp.md` before section 1:
+
+```markdown
+> **Applied from ~/.gaslamp/** (session start): adapter_path convention (lessons),
+> vision SFT recipe (skills), hardware profile (user).
+```
+
+**Do NOT modify `.gaslamp_context/` during the session** — it is a read-only snapshot. New lessons and recipes are written back only via `scripts/reflect.py` at project end (Phase 7).
 
 ### Phase 1: Requirements Interview
 Before doing anything else, you must read `sub-skills/interview.md` to conduct the 5-Point Unsloth Contract interview. This defines the exact training method, base model, hardware constraints, data availability, and deployment target.
@@ -1093,6 +1114,41 @@ See the `scripts/` directory for ready-to-use templates:
 - **`scripts/setup_colab.py`**: Auto-setup Unsloth on a Google Colab VM (GPU detection, install, verification).
 - **`scripts/colab_training.py`**: Helper module for remote Colab training (upload, execute, download, metrics polling).
 - **`scripts/terminal_dashboard.py`**: Standalone terminal UI using plotext.
+
+### Phase 7: Reflection & Memory Synthesis
+
+After the project is complete (post Phase 6 or 6.5), synthesize what was learned into long-term memory at `~/.gaslamp/`. This is what makes the agent improve over time.
+
+**Step 1 — Extract raw candidates from the completed project:**
+```bash
+python scripts/reflect.py . --extract
+```
+Outputs a JSON array to stdout with candidates from gaslamp.md (`§ 5` environment, `§ 6` hyperparameters, `§ 9` file inventory, `§ 11` workarounds) and memory.md (`Discoveries & Notes`). `📖` Learn blocks are skipped — they are generic ML education, not operational lessons.
+
+**Step 2 — Classify and summarize** each candidate using your own judgment:
+- **`LESSON`** — an isolated fact or gotcha (→ `lessons.md`). Write as ≤120-char statement.
+- **`USER_PREF`** — hardware/preference signal (→ `user.md`). Update or merge with existing.
+- **`SKILL`** — a connected procedure: synthesize across `§ 6` + `§ 9` + `§ 11` into a **scenario recipe** with a `When:` trigger condition (→ `skills.md`). Format:
+  ```
+  When: task=<type> AND hardware=<hw> [AND model_size<=<N>B]
+  - Phase N: step one
+  - Phase N: step two
+  Source: <project_dir>
+  ```
+  A recipe earns its place only when it connects multiple cross-section decisions into a reusable procedure. Single isolated facts stay as lessons.
+
+**Step 3 — Write to long-term memory:**
+```bash
+echo '<classified_json>' | python scripts/reflect.py --write
+# Or preview first:
+echo '<classified_json>' | python scripts/reflect.py --write --dry-run
+```
+
+The script handles dedup (sha256), char-limit enforcement (≤3000 chars for lessons/skills, ≤2000 for user), and quarterly archiving (`~/.gaslamp/archive/`) of evicted oldest entries.
+
+**→ After Phase 7**: Update `gaslamp.md` with a final line in § 11 noting what was reflected: `Reflected to ~/.gaslamp/ on YYYY-MM-DD.`
+
+---
 
 ## Resources
 

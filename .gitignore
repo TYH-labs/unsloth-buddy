@@ -7,3 +7,6 @@ _local_backup/
 __pycache__/
 *.pyc
 *.pyo
+
+# Self-evolve: local-only memory snapshot (user-specific, never committed)
+.gaslamp_context/
