@@ -10,3 +10,6 @@ __pycache__/
 
 # Self-evolve: local-only memory snapshot (user-specific, never committed)
 .gaslamp_context/
+
+# Reference/scratch docs (never committed)
+ref/
