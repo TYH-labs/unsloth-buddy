@@ -13,6 +13,8 @@ Two modes:
   # Mode 2: Write agent-classified entries to ~/.gaslamp/
   echo '<json>' | python scripts/reflect.py --write
   echo '<json>' | python scripts/reflect.py --write --dry-run
+  python scripts/reflect.py --write --input payload.json
+  python scripts/reflect.py --write --input payload.json --dry-run
 
 Extract reads gaslamp.md (§5, §6, §9, §11) + memory.md (Discoveries) and
 emits structured JSON to stdout.  Write reads classified JSON from stdin and
@@ -515,20 +517,39 @@ def main():
     if "--write" in args:
         dry_run = "--dry-run" in args
 
-        # Read JSON from stdin
-        if sys.stdin.isatty():
+        # Support --input <file> as alternative to stdin piping
+        input_file = None
+        if "--input" in args:
+            idx = args.index("--input")
+            if idx + 1 >= len(args):
+                print("Error: --input requires a file path argument.", file=sys.stderr)
+                sys.exit(1)
+            input_file = Path(args[idx + 1])
+            if not input_file.exists():
+                print(f"Error: input file not found: {input_file}", file=sys.stderr)
+                sys.exit(1)
+
+        # Read JSON from file or stdin
+        if input_file:
+            try:
+                payload = json.loads(input_file.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as e:
+                print(f"Error: Invalid JSON in {input_file}: {e}", file=sys.stderr)
+                sys.exit(1)
+        elif sys.stdin.isatty():
             print(
-                "Error: --write expects JSON on stdin.\n"
-                "Usage: echo '<json>' | python scripts/reflect.py --write",
+                "Error: --write expects JSON on stdin or via --input <file>.\n"
+                "Usage: echo '<json>' | python scripts/reflect.py --write\n"
+                "       python scripts/reflect.py --write --input payload.json",
                 file=sys.stderr,
             )
             sys.exit(1)
-
-        try:
-            payload = json.load(sys.stdin)
-        except json.JSONDecodeError as e:
-            print(f"Error: Invalid JSON on stdin: {e}", file=sys.stderr)
-            sys.exit(1)
+        else:
+            try:
+                payload = json.load(sys.stdin)
+            except json.JSONDecodeError as e:
+                print(f"Error: Invalid JSON on stdin: {e}", file=sys.stderr)
+                sys.exit(1)
 
         label = "[DRY RUN] " if dry_run else ""
         print(f"\n{label}Reflecting to {GASLAMP_HOME}/\n", file=sys.stderr)
