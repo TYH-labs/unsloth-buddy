@@ -19,6 +19,7 @@ Prints the project directory path to stdout so the caller can cd into it.
 """
 
 import re
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -101,6 +102,28 @@ if not log_file.exists():
 | 3: Evaluation | pending |
 | 4: Export | pending |
 """)
+
+# ── Global Memory Injection (Frozen Snapshot) ────────────────────────────────
+# If ~/.gaslamp/ exists, copy user.md / lessons.md / skills.md into
+# .gaslamp_context/ inside the project as a read-only session snapshot.
+# The agent reads these at session start and silently applies relevant
+# lessons/recipes — it does NOT modify them during the session.
+gaslamp_home = Path.home() / ".gaslamp"
+if gaslamp_home.exists():
+    context_dir = project_dir / ".gaslamp_context"
+    context_dir.mkdir(exist_ok=True)
+    injected = []
+    for fname in ("user.md", "lessons.md", "skills.md"):
+        src = gaslamp_home / fname
+        if src.exists():
+            shutil.copy2(src, context_dir / fname)
+            injected.append(fname)
+    if injected:
+        print(
+            f"[init] Injected global memory snapshot → {context_dir} "
+            f"({', '.join(injected)})",
+            file=sys.stderr,
+        )
 
 # ── Print path for caller to use ──────────────────────────────────────────────
 print(project_dir)
