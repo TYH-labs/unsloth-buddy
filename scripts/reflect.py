@@ -55,6 +55,9 @@ LEARN_BLOCK_RE = re.compile(
 # Entry header in memory files: ### [YYYY-MM-DD] Title
 ENTRY_HEADER_RE = re.compile(r"^###\s+\[(\d{4}-\d{2}-\d{2})\]\s+(.+)$", re.MULTILINE)
 
+# Category header in user.md (new format): ## Category Name
+USER_CATEGORY_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # EXTRACT MODE
@@ -75,28 +78,50 @@ def _parse_gaslamp_sections(text: str) -> dict[str, str]:
     return sections
 
 
+# Standard memory.md template sections — skip these, extract everything else
+_MEMORY_SKIP_HEADERS = frozenset({"Model", "Dataset", "Hyperparameters"})
+
+
 def _parse_memory_discoveries(text: str) -> str:
-    """Extract non-placeholder lines from memory.md Discoveries & Notes."""
-    in_discoveries = False
+    """Extract content from all non-standard ## sections in memory.md.
+
+    Standard template sections (Model, Dataset, Hyperparameters) are skipped.
+    Everything else — 'Discoveries & Notes', 'Template friction log',
+    'Dashboard issues', or any custom header — is treated as discovery content.
+    This tolerates agents who use descriptive section names instead of the
+    canonical 'Discoveries & Notes' header.
+    """
     lines = []
+    in_custom_section = False
+
     for line in text.splitlines():
-        if "Discoveries" in line and "Notes" in line:
-            in_discoveries = True
+        # ## section boundary — determine if standard or custom
+        if line.startswith("## "):
+            # Strip trailing parenthetical or dash-delimited commentary
+            # e.g. "Template friction log — mps_grpo_example.py" → "Template friction log"
+            raw_name = line[3:].strip()
+            base_name = raw_name.split("(")[0].split("—")[0].strip()
+            in_custom_section = base_name not in _MEMORY_SKIP_HEADERS
             continue
-        if in_discoveries:
-            # Stop at next heading
-            if line.startswith("#"):
-                break
-            stripped = line.strip()
-            # Skip blanks, HTML comments, placeholder lines
-            if (
-                not stripped
-                or stripped.startswith("<!--")
-                or stripped.endswith("-->")
-                or "TBD" in stripped
-            ):
-                continue
-            lines.append(stripped)
+
+        # H1 title line — skip
+        if line.startswith("# "):
+            continue
+
+        if not in_custom_section:
+            continue
+
+        stripped = line.strip()
+        # Skip blanks, HTML comments, placeholder lines
+        if (
+            not stripped
+            or stripped.startswith("<!--")
+            or stripped.endswith("-->")
+            or "TBD" in stripped
+        ):
+            continue
+        lines.append(stripped)
+
     return "\n".join(lines)
 
 
@@ -110,6 +135,43 @@ def _infer_project_date(dirname: str) -> str:
         except (ValueError, IndexError):
             pass
     return datetime.now().strftime("%Y-%m-%d")
+
+
+def _is_placeholder_section(text: str) -> bool:
+    """Return True if a gaslamp.md section contains only template noise.
+
+    Detects: HTML comment blocks, empty table rows (| | |), table rows where
+    all value cells are blank (| Parameter | | |), and section separators (---).
+    Sections that pass this check are skipped from extract candidates.
+    """
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s == "---":
+            continue
+        if s.startswith("<!--") or s.endswith("-->"):
+            continue
+        # Table separator row: |---|---|
+        if s.startswith("|") and all(c in "|-: " for c in s):
+            continue
+        if s.startswith("|") and s.endswith("|"):
+            cells = [c.strip() for c in s[1:-1].split("|")]
+            # All cells empty: | | |
+            if all(not c for c in cells):
+                continue
+            # Header cell present but all value cells empty: | Parameter | | |
+            if len(cells) >= 2 and all(not c for c in cells[1:]):
+                continue
+            # Template column header row: all cells are short plain words with no
+            # backticks, slashes, or digits (e.g. | Parameter | Value | Why |)
+            if all(
+                len(c) <= 20 and "`" not in c and "/" not in c
+                and not any(ch.isdigit() for ch in c)
+                for c in cells if c
+            ):
+                continue
+        # Any other non-empty line is meaningful content
+        return False
+    return True  # only noise found
 
 
 def extract_project(project_dir: Path) -> Optional[Dict]:
@@ -130,7 +192,7 @@ def extract_project(project_dir: Path) -> Optional[Dict]:
     sections = _parse_gaslamp_sections(gaslamp_text)
 
     # § 5 Environment
-    if "5" in sections and sections["5"].strip():
+    if "5" in sections and sections["5"].strip() and not _is_placeholder_section(sections["5"]):
         candidates.append({
             "section": "environment",
             "source": "gaslamp.md §5",
@@ -138,7 +200,7 @@ def extract_project(project_dir: Path) -> Optional[Dict]:
         })
 
     # § 6 Hyperparameters
-    if "6" in sections and sections["6"].strip():
+    if "6" in sections and sections["6"].strip() and not _is_placeholder_section(sections["6"]):
         candidates.append({
             "section": "hyperparameters",
             "source": "gaslamp.md §6",
@@ -146,7 +208,7 @@ def extract_project(project_dir: Path) -> Optional[Dict]:
         })
 
     # § 9 File Inventory
-    if "9" in sections and sections["9"].strip():
+    if "9" in sections and sections["9"].strip() and not _is_placeholder_section(sections["9"]):
         candidates.append({
             "section": "file_inventory",
             "source": "gaslamp.md §9",
@@ -154,7 +216,7 @@ def extract_project(project_dir: Path) -> Optional[Dict]:
         })
 
     # § 11 Workarounds & Critical Notes
-    if "11" in sections and sections["11"].strip():
+    if "11" in sections and sections["11"].strip() and not _is_placeholder_section(sections["11"]):
         candidates.append({
             "section": "workarounds",
             "source": "gaslamp.md §11",
@@ -171,6 +233,31 @@ def extract_project(project_dir: Path) -> Optional[Dict]:
                 "source": "memory.md",
                 "text": discoveries,
             })
+
+    # .reflect_hints.json — inline hints written during the session
+    # These are pre-flagged by the agent at the moment of discovery, so they
+    # don't need archaeological reconstruction in Phase 7.
+    hints_path = project_dir / ".reflect_hints.json"
+    if hints_path.exists():
+        try:
+            hints = json.loads(hints_path.read_text(encoding="utf-8"))
+            if isinstance(hints, list) and hints:
+                # Render hints as human-readable text for the extract output
+                hint_lines = []
+                for h in hints:
+                    phase = h.get("phase", "?")
+                    type_hint = h.get("type_hint", "?")
+                    hint_text = h.get("hint", "")
+                    hint_lines.append(f"[Phase {phase}] ({type_hint}) {hint_text}")
+                candidates.append({
+                    "section": "inline_hints",
+                    "source": ".reflect_hints.json",
+                    "pre_flagged": True,
+                    "hints": hints,
+                    "text": "\n".join(hint_lines),
+                })
+        except (json.JSONDecodeError, AttributeError):
+            pass  # malformed hints file — skip silently
 
     if not candidates:
         return None
@@ -234,6 +321,48 @@ def _parse_entries(text: str) -> List[Dict]:
     return entries
 
 
+def _parse_user_entries(text: str) -> List[Dict]:
+    """Parse user.md into a list of {category, body, date} entries.
+
+    Handles the new ## Category format. If the file still uses the old
+    ### [YYYY-MM-DD] Title format (schema v1.0), auto-migrates by splitting
+    on ' — ' to derive a category name — the caller will rewrite in new format.
+    """
+    # Strip front-matter
+    if text.startswith("---"):
+        end = text.find("---", 3)
+        if end != -1:
+            text = text[end + 3:].strip()
+
+    # Try new ## Category format
+    matches = list(USER_CATEGORY_RE.finditer(text))
+    if matches:
+        entries = []
+        for i, m in enumerate(matches):
+            category = m.group(1).strip()
+            start = m.end()
+            end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            block = text[start:end_pos].strip()
+            date = datetime.now().strftime("%Y-%m-%d")
+            body_lines = []
+            for line in block.splitlines():
+                if line.startswith("Updated: "):
+                    date = line.replace("Updated: ", "").strip()
+                else:
+                    body_lines.append(line)
+            body = "\n".join(body_lines).strip()
+            entries.append({"category": category, "body": body, "date": date})
+        return entries
+
+    # Fallback: auto-migrate from old ### [YYYY-MM-DD] Title format
+    migrated = []
+    for e in _parse_entries(text):
+        # "Hardware — Apple Silicon" → "Hardware"
+        category = e["title"].split("—")[0].strip()
+        migrated.append({"category": category, "body": e["body"], "date": e["date"]})
+    return migrated
+
+
 def _quarter_for_date(date_str: str) -> str:
     """Return YYYY_Q{N} for a date string."""
     try:
@@ -262,6 +391,25 @@ def _render_file(file_type: str, entries: list[dict]) -> str:
     return f"{front_matter}\n{body}\n"
 
 
+def _render_user_entries(entries: List[Dict]) -> str:
+    """Render user.md entries as ## Category sections with Updated: date lines."""
+    parts = []
+    for e in entries:
+        parts.append(f"## {e['category']}")
+        parts.append(e["body"])
+        parts.append(f"Updated: {e['date']}")
+        parts.append("")
+    return "\n".join(parts).strip()
+
+
+def _render_user_file(entries: List[Dict]) -> str:
+    """Render a full user.md with front-matter."""
+    body = _render_user_entries(entries)
+    char_count = len(body)
+    front_matter = _make_front_matter(SCHEMAS["user"], char_count)
+    return f"{front_matter}\n{body}\n"
+
+
 def _format_lesson_entry(item: dict) -> dict:
     """Format a classified lesson item into an entry."""
     body_parts = [item["body"]]
@@ -277,12 +425,11 @@ def _format_lesson_entry(item: dict) -> dict:
 
 
 def _format_user_entry(item: dict) -> dict:
-    """Format a classified user preference item into an entry."""
+    """Format a classified user preference item into a category entry."""
     return {
-        "date": item.get("date", datetime.now().strftime("%Y-%m-%d")),
-        "title": item["title"],
+        "category": item["title"],  # title field becomes the ## Category heading
         "body": item["body"],
-        "hash": _content_hash(f"{item['title']}\n{item['body']}"),
+        "date": item.get("date", datetime.now().strftime("%Y-%m-%d")),
     }
 
 
@@ -309,6 +456,28 @@ FORMATTERS = {
     "lessons": _format_lesson_entry,
     "skills": _format_skill_entry,
 }
+
+
+def _validate_item(file_type: str, item: dict) -> List[str]:
+    """Return validation error strings for a payload item. Empty list = valid.
+
+    F-7: prevents missing required fields from writing silently malformed entries.
+    """
+    errors = []
+    if file_type in ("lessons", "user"):
+        if not str(item.get("title", "")).strip():
+            errors.append("missing 'title'")
+        if not str(item.get("body", "")).strip():
+            errors.append("missing 'body'")
+    elif file_type == "skills":
+        if not str(item.get("title", "")).strip():
+            errors.append("missing 'title'")
+        if not str(item.get("when", "")).strip():
+            errors.append("missing 'when'")
+        steps = item.get("steps")
+        if not steps or not isinstance(steps, list) or len(steps) == 0:
+            errors.append("missing or empty 'steps' (must be a non-empty list)")
+    return errors
 
 
 def _ensure_gaslamp_home():
@@ -399,19 +568,85 @@ def write_entries(payload: dict, dry_run: bool = False):
         if not new_items:
             continue
 
-        formatter = FORMATTERS[file_type]
+        # F-7: validate all items before writing — skip malformed entries
+        valid_items = []
+        for item in new_items:
+            errors = _validate_item(file_type, item)
+            if errors:
+                title = item.get("title", "(no title)")
+                print(
+                    f"  Warning: skipping {file_type} entry {title!r}: "
+                    f"{', '.join(errors)}",
+                    file=sys.stderr,
+                )
+            else:
+                valid_items.append(item)
+        if not valid_items:
+            continue
+        new_items = valid_items
+
         file_path = GASLAMP_HOME / f"{file_type}.md"
 
-        # Load existing entries
+        # F-6: user.md uses category-replace logic (not append + SHA dedup)
+        if file_type == "user":
+            existing_entries = []
+            if file_path.exists():
+                # _parse_user_entries auto-migrates from old ### dated format
+                existing_entries = _parse_user_entries(
+                    file_path.read_text(encoding="utf-8")
+                )
+
+            existing_by_cat = {e["category"]: i for i, e in enumerate(existing_entries)}
+            added = 0
+            updated = 0
+            for item in new_items:
+                entry = _format_user_entry(item)
+                cat = entry["category"]
+                if cat in existing_by_cat:
+                    existing_entries[existing_by_cat[cat]] = entry
+                    updated += 1
+                else:
+                    existing_by_cat[cat] = len(existing_entries)
+                    existing_entries.append(entry)
+                    added += 1
+
+            if added == 0 and updated == 0:
+                continue
+
+            body_len = len(_render_user_entries(existing_entries))
+
+            if dry_run:
+                print(f"\n  [DRY RUN] user.md:", file=sys.stderr)
+                print(f"    +{added} new, {updated} updated in-place", file=sys.stderr)
+                print(f"    char_count: {body_len}/{CHAR_LIMITS['user']}", file=sys.stderr)
+                print(f"    entries: {len(existing_entries)}", file=sys.stderr)
+            else:
+                file_path.write_text(
+                    _render_user_file(existing_entries), encoding="utf-8"
+                )
+                print(
+                    f"  user.md: +{added} new, {updated} updated in-place "
+                    f"({body_len}/{CHAR_LIMITS['user']} chars, "
+                    f"{len(existing_entries)} entries)",
+                    file=sys.stderr,
+                )
+
+            file_stats["user"] = {
+                "char_count": body_len,
+                "updated": datetime.now().strftime("%Y-%m-%d"),
+                "entry_count": len(existing_entries),
+            }
+            continue  # skip generic flow below
+
+        # ── Generic flow for lessons and skills ───────────────────────────────
+        formatter = FORMATTERS[file_type]
+
         existing_entries = []
         existing_hashes = set()
         if file_path.exists():
-            existing_entries = _parse_entries(
-                file_path.read_text(encoding="utf-8")
-            )
+            existing_entries = _parse_entries(file_path.read_text(encoding="utf-8"))
             existing_hashes = {e["hash"] for e in existing_entries}
 
-        # Format and dedup new entries
         added = 0
         skipped = 0
         for item in new_items:
@@ -431,16 +666,11 @@ def write_entries(payload: dict, dry_run: bool = False):
                 )
             continue
 
-        # Sort by date (oldest first, for eviction ordering)
         existing_entries.sort(key=lambda e: e["date"])
 
-        # Enforce char limit via eviction
         char_limit = CHAR_LIMITS[file_type]
-        existing_entries = _evict_oldest(
-            existing_entries, char_limit, file_type, dry_run
-        )
+        existing_entries = _evict_oldest(existing_entries, char_limit, file_type, dry_run)
 
-        # Render and write
         content = _render_file(file_type, existing_entries)
         body_len = len(_render_entries(existing_entries))
 
