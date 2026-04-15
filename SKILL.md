@@ -28,7 +28,9 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/init_project.py` | Create dated project directory with standard layout |
+| `scripts/init_project.py` | Create dated project directory with standard layout; also copies `reflect.py` and `add_reflect_hint.py` into the project |
+| `scripts/reflect.py` | Long-term memory extraction (`--extract`) and write to `~/.gaslamp/` (`--write`); **copied into each project dir by `init_project.py`** — call as `python3 reflect.py` from inside the project |
+| `scripts/add_reflect_hint.py` | Append an inline reflection hint to `.reflect_hints.json` during phases 2–6; **copied into each project dir by `init_project.py`** — call as `python3 add_reflect_hint.py` from inside the project |
 | `scripts/detect_system.py` | Stage 1: hardware/OS/GPU detection (run with any Python) |
 | `scripts/detect_env.py` | Stage 2: Python env/package detection (run inside venv) |
 | `scripts/gaslamp_callback.py` | NVIDIA/TRL live dashboard callback (copy into project) |
@@ -83,6 +85,7 @@ cd "$PROJECT_DIR"
 ├── gaslamp.md          # roadbook: key decisions + rationale + learning warmup
 ├── memory.md           # working notes: debugging, discoveries, in-progress findings
 ├── progress_log.md     # chronological session log of each phase
+├── .reflect_hints.json # (optional) inline reflection hints written during the session
 └── .gaslamp_context/   # (if ~/.gaslamp/ exists) frozen snapshot of long-term memory
     ├── user.md         #   read-only — hardware, preferences
     ├── lessons.md      #   read-only — cross-project gotchas
@@ -96,6 +99,7 @@ cd "$PROJECT_DIR"
 | `gaslamp.md` | Only final, kept decisions + why + 📖 learning context. Reproducible by another agent or person. | After each phase decision is confirmed |
 | `memory.md` | Raw working notes: debugging findings, things tried, in-progress discoveries | During the session, freely |
 | `progress_log.md` | Chronological phase status log | At the start/end of each phase |
+| `.reflect_hints.json` | Pre-flagged inline reflection hints — workarounds and non-obvious discoveries captured at the moment they occur | Immediately after confirming a workaround or unexpected discovery (phases 2–6) |
 
 **If `gaslamp.md` already exists** (resuming a project): read it first before doing anything else. It is the authoritative record of all decisions already made.
 
@@ -118,7 +122,26 @@ Record what was applied as a preamble in `gaslamp.md` before section 1:
 > vision SFT recipe (skills), hardware profile (user).
 ```
 
-**Do NOT modify `.gaslamp_context/` during the session** — it is a read-only snapshot. New lessons and recipes are written back only via `scripts/reflect.py` at project end (Phase 7).
+**Do NOT modify `.gaslamp_context/` during the session** — it is a read-only snapshot. New lessons and recipes are written back only via `reflect.py` at project end (Phase 7).
+
+#### Inline Reflection Hints
+
+Whenever you apply a workaround or discover something non-obvious **during phases 2–6**, immediately append a hint using the local copy inside the project dir:
+
+```bash
+python3 add_reflect_hint.py . \
+  --phase 3 \
+  --hint "one-sentence description of what was discovered or fixed" \
+  --type lesson
+```
+
+`--type` is optional (`lesson` | `skill` | `user`) — omit if unsure; Phase 7 will classify. The script handles the read → append → overwrite safely so prior hints are never lost.
+
+**Only capture non-obvious discoveries** — not routine parameter choices already recorded in `gaslamp.md`. Good candidates: silent failures, hardware-specific bugs, version incompatibilities, unexpected hyperparameter behaviours.
+
+**On resume**: run `python3 add_reflect_hint.py . --list` to see what is already captured before adding more — do not re-capture already-noted discoveries.
+
+`reflect.py --extract` automatically includes `.reflect_hints.json` alongside the gaslamp.md scan. If the file does not exist, extraction is identical to v1.
 
 ### Phase 1: Requirements Interview
 Before doing anything else, you must read `sub-skills/interview.md` to conduct the 5-Point Unsloth Contract interview. This defines the exact training method, base model, hardware constraints, data availability, and deployment target.
@@ -1121,14 +1144,22 @@ After the project is complete (post Phase 6 or 6.5), synthesize what was learned
 
 **Step 1 — Extract raw candidates from the completed project:**
 ```bash
-python scripts/reflect.py . --extract
+python3 reflect.py . --extract
 ```
-Outputs a JSON array to stdout with candidates from gaslamp.md (`§ 5` environment, `§ 6` hyperparameters, `§ 9` file inventory, `§ 11` workarounds) and memory.md (`Discoveries & Notes`). `📖` Learn blocks are skipped — they are generic ML education, not operational lessons.
+Outputs a JSON array to stdout with candidates from gaslamp.md (`§ 5` environment, `§ 6` hyperparameters, `§ 9` file inventory, `§ 11` workarounds), memory.md (`Discoveries & Notes`), and `.reflect_hints.json` if present. `📖` Learn blocks are skipped — they are generic ML education, not operational lessons.
+
+Inline hints (`section: "inline_hints"`, `pre_flagged: true`) are already identified as lesson/skill/user — classify them quickly in Step 2 rather than reconstructing from context. Gaslamp.md candidates still require full classification.
+
+`reflect.py` is a pinned local copy placed by `init_project.py` — run it from inside the project dir.
 
 **Step 2 — Classify and summarize** each candidate using your own judgment:
-- **`LESSON`** — an isolated fact or gotcha (→ `lessons.md`). Write as ≤120-char statement.
+
+**Fast path — inline hints** (`section: "inline_hints"`): if `type_hint` is already set, accept it and write a ≤120-char body directly without full reconstruction. Only run the full classification pass below if `type_hint` is absent.
+
+**Full classification** — for gaslamp.md and memory.md candidates:
+- **`LESSON`** — an isolated fact or gotcha (→ `lessons.md`). Write as ≤120-char statement. For `§ 6` (hyperparameters): extract only non-default values that differed from the obvious choice — skip standard lr/batch entries unless they produced a surprising outcome. For `§ 9` (file inventory): extract which template was copied and under what name — the "script source → project filename" mapping is the reusable fact.
 - **`USER_PREF`** — hardware/preference signal (→ `user.md`). Update or merge with existing.
-- **`SKILL`** — a connected procedure: synthesize across `§ 6` + `§ 9` + `§ 11` into a **scenario recipe** with a `When:` trigger condition (→ `skills.md`). Format:
+- **`SKILL`** — a connected procedure: synthesize across `§ 6` + `§ 9` + `§ 11` into a **scenario recipe** with a `When:` trigger condition (→ `skills.md`). For `§ 11` (workarounds): treat each bullet as a separate candidate — do not batch multiple workarounds into one skill. Format:
   ```
   When: task=<type> AND hardware=<hw> [AND model_size<=<N>B]
   - Phase N: step one
@@ -1138,10 +1169,41 @@ Outputs a JSON array to stdout with candidates from gaslamp.md (`§ 5` environme
   A recipe earns its place only when it connects multiple cross-section decisions into a reusable procedure. Single isolated facts stay as lessons.
 
 **Step 3 — Write to long-term memory:**
+
+Write `.reflect_payload.json` using this schema, then run `reflect.py --write`:
+
+```json
+{
+  "user": [
+    { "title": "Hardware — Apple Silicon", "body": "...", "date": "YYYY-MM-DD" }
+  ],
+  "lessons": [
+    {
+      "title": "Short title ≤60 chars",
+      "body": "One-sentence statement ≤120 chars",
+      "source": "project_dir_name",
+      "date": "YYYY-MM-DD"
+    }
+  ],
+  "skills": [
+    {
+      "title": "Scenario name",
+      "when": "task=<type> AND hardware=<hw> [AND model_size<=<N>B]",
+      "steps": ["Phase N: step one", "Phase N: step two"],
+      "source": "project_dir_name",
+      "date": "YYYY-MM-DD"
+    }
+  ]
+}
+```
+
+All three top-level keys are optional — omit any that have no entries. `date` defaults to today if omitted.
+
 ```bash
-echo '<classified_json>' | python scripts/reflect.py --write
-# Or preview first:
-echo '<classified_json>' | python scripts/reflect.py --write --dry-run
+# Preview first:
+python3 reflect.py --write --input .reflect_payload.json --dry-run
+# Then write for real:
+python3 reflect.py --write --input .reflect_payload.json
 ```
 
 The script handles dedup (sha256), char-limit enforcement (≤3000 chars for lessons/skills, ≤2000 for user), and quarterly archiving (`~/.gaslamp/archive/`) of evicted oldest entries.

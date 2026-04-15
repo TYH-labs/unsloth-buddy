@@ -3,7 +3,7 @@
   "owner": { "name": "Gaslamp", "url": "https://gaslamp.dev" },
   "metadata": {
     "description": "Agentic LLM fine-tuning skill for Claude Code — Unsloth on NVIDIA, mlx-tune on Apple Silicon.",
-    "version": "1.0.3",
+    "version": "1.0.5",
     "repository": "https://github.com/TYH-labs/unsloth-buddy",
     "documentation": "https://gaslamp.dev/unsloth"
   },
@@ -37,7 +37,9 @@
         "./scripts/search_design.py",
         "./scripts/colab_training.py",
         "./scripts/setup_colab.py",
-        "./scripts/llamacpp.py"
+        "./scripts/llamacpp.py",
+        "./scripts/reflect.py",
+        "./scripts/add_reflect_hint.py"
       ],
       "templates": [
         "./templates/gaslamp_template.md",

@@ -13,7 +13,12 @@ Creates:
     ├── logs/               # training stdout/stderr logs
     ├── gaslamp.md          # roadbook: key decisions + rationale + learning warmup (reproducible)
     ├── memory.md           # working notes: discoveries, debugging, in-progress findings
-    └── progress_log.md     # chronological session log of each phase
+    ├── progress_log.md     # chronological session log of each phase
+    ├── reflect.py          # pinned copy — long-term memory extraction + write
+    └── add_reflect_hint.py # pinned copy — inline reflection hint appender
+
+Reflection scripts are pinned at project-creation time so each project is
+self-contained and independent of future skill updates.
 
 Prints the project directory path to stdout so the caller can cd into it.
 """
@@ -101,6 +106,7 @@ if not log_file.exists():
 | 2: Training | pending |
 | 3: Evaluation | pending |
 | 4: Export | pending |
+| 7: Reflection | pending |
 """)
 
 # ── Global Memory Injection (Frozen Snapshot) ────────────────────────────────
@@ -124,6 +130,17 @@ if gaslamp_home.exists():
             f"({', '.join(injected)})",
             file=sys.stderr,
         )
+
+# ── Copy reflection scripts (pinned to this skill version) ───────────────────
+# Projects are self-contained: they carry the exact script versions used at
+# creation time, independent of future skill updates or repo location changes.
+scripts_dir = Path(__file__).parent
+for script_name in ("reflect.py", "add_reflect_hint.py"):
+    src = scripts_dir / script_name
+    dst = project_dir / script_name
+    if src.exists() and not dst.exists():
+        shutil.copy2(src, dst)
+        print(f"[init] Copied {script_name} → {project_dir}/", file=sys.stderr)
 
 # ── Print path for caller to use ──────────────────────────────────────────────
 print(project_dir)
