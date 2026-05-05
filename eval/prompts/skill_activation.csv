@@ -1,0 +1,7 @@
+id,expected_activation,category,dry_run,fixture,prompt
+explicit-sft-jsonl,true,explicit,true,,"Use unsloth-buddy to fine-tune Qwen2.5-0.5B on a local JSONL instruction dataset. The users are internal support agents."
+implicit-support-csv,true,implicit,true,,"I have a CSV of support tickets and want a small model that replies like our support team."
+macbook-capability,true,hardware,true,,"I only have an M3 MacBook Air. Can I fine-tune a tiny model for a tutoring chatbot?"
+grpo-apple,true,hardware,true,,"I want to train a model to solve simple math with GRPO on my Apple Silicon Mac."
+vision-sft,true,vision,true,,"I have images with captions and want a model that describes manufacturing defects."
+

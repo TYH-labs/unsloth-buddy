@@ -13,3 +13,6 @@ __pycache__/
 
 # Reference/scratch docs (never committed)
 ref/
+
+# Skill eval run artifacts
+eval/artifacts/

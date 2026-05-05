@@ -1,0 +1,7 @@
+id,expected_activation,category,dry_run,fixture,prompt
+csv-conversion-only,false,negative,true,,"Write a Python script that converts this CSV into JSONL."
+explain-lora,false,negative,true,,"Explain LoRA and QLoRA tradeoffs for a beginner."
+readme-summary,false,negative,true,,"Summarize this repository README and list the setup commands."
+existing-upload,false,negative,true,,"I already have a LoRA adapter. Show me how to upload it to Hugging Face."
+eval-script-only,false,negative,true,,"Write a small script to compare two model outputs in a JSONL file."
+
