@@ -1168,6 +1168,14 @@ Inline hints (`section: "inline_hints"`, `pre_flagged: true`) are already identi
   ```
   A recipe earns its place only when it connects multiple cross-section decisions into a reusable procedure. Single isolated facts stay as lessons.
 
+**Promotion gate fields** — set these on every payload entry (required for gate to function):
+- `"priority"`: `"high"` (write to long-term memory) | `"medium"` (project-only) | `"low"` (discard). Promote only facts that will change behaviour on a future project.
+- `"durability"`: `"durable"` (stable across projects) | `"recurring"` (likely to recur) | `"transient"` (one-off). Only durable and recurring facts are worth long-term storage.
+- `"decision"`: `"promote"` (write to `~/.gaslamp/`) | `"keep_project_only"` (record in `.reflect_decisions.md` but do not promote). Use `keep_project_only` for facts that are specific to this project and unlikely to generalise.
+- `"source_candidates"`: list of `candidate_id` strings from the `--extract` output (e.g. `["qwen_chip2_sft:section_11:a1b2c3d4"]`). Include for traceability.
+
+Entries **omitting all four fields** are treated as `priority=high / durability=durable / decision=promote` (v1.1 backwards compat) and will produce a warning. Prefer always including the fields explicitly.
+
 **Step 3 — Write to long-term memory:**
 
 Write `.reflect_payload.json` using this schema, then run `reflect.py --write`:
@@ -1175,14 +1183,26 @@ Write `.reflect_payload.json` using this schema, then run `reflect.py --write`:
 ```json
 {
   "user": [
-    { "title": "Hardware — Apple Silicon", "body": "...", "date": "YYYY-MM-DD" }
+    {
+      "title": "Hardware — Apple Silicon",
+      "body": "...",
+      "date": "YYYY-MM-DD",
+      "priority": "high",
+      "durability": "durable",
+      "decision": "promote",
+      "source_candidates": ["project_dir:section_5:a1b2c3d4"]
+    }
   ],
   "lessons": [
     {
       "title": "Short title ≤60 chars",
       "body": "One-sentence statement ≤120 chars",
       "source": "project_dir_name",
-      "date": "YYYY-MM-DD"
+      "date": "YYYY-MM-DD",
+      "priority": "high",
+      "durability": "durable",
+      "decision": "promote",
+      "source_candidates": ["project_dir:section_11:e5f6a7b8"]
     }
   ],
   "skills": [
@@ -1191,22 +1211,27 @@ Write `.reflect_payload.json` using this schema, then run `reflect.py --write`:
       "when": "task=<type> AND hardware=<hw> [AND model_size<=<N>B]",
       "steps": ["Phase N: step one", "Phase N: step two"],
       "source": "project_dir_name",
-      "date": "YYYY-MM-DD"
+      "date": "YYYY-MM-DD",
+      "priority": "high",
+      "durability": "durable",
+      "decision": "promote",
+      "source_candidates": ["project_dir:section_9:c9d0e1f2"]
     }
   ]
 }
 ```
 
-All three top-level keys are optional — omit any that have no entries. `date` defaults to today if omitted.
+All three top-level keys are optional — omit any that have no entries. `date` defaults to today if omitted. Gate fields (`priority`, `durability`, `decision`) are optional but should always be set explicitly.
 
 ```bash
-# Preview first:
+# Preview gate outcomes and decisions without writing:
 python3 reflect.py --write --input .reflect_payload.json --dry-run
+# Inspect .reflect_decisions.preview.md before committing
 # Then write for real:
 python3 reflect.py --write --input .reflect_payload.json
 ```
 
-The script handles dedup (sha256), char-limit enforcement (≤3000 chars for lessons/skills, ≤2000 for user), and quarterly archiving (`~/.gaslamp/archive/`) of evicted oldest entries.
+The script handles dedup (sha256), char-limit enforcement (≤3000 chars for lessons/skills, ≤2000 for user), and quarterly archiving (`~/.gaslamp/archive/`) of evicted oldest entries. After writing, `.reflect_decisions.md` lists every entry with its outcome (promoted / gate_blocked / dup_skipped / evicted_to_archive).
 
 **→ After Phase 7**: Update `gaslamp.md` with a final line in § 11 noting what was reflected: `Reflected to ~/.gaslamp/ on YYYY-MM-DD.`
 
