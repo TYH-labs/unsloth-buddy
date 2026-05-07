@@ -4,7 +4,7 @@ reflect.py — Long-term memory extraction and persistence for unsloth-buddy.
 This is a stdlib-only, dumb file-management tool.  It does NO LLM work.
 The agent that invokes it IS the LLM — it classifies and summarises.
 
-Two modes:
+Three modes:
 
   # Mode 1: Extract raw candidates from a completed project
   python scripts/reflect.py path/to/project_dir --extract
@@ -15,20 +15,40 @@ Two modes:
   echo '<json>' | python scripts/reflect.py --write --dry-run
   python scripts/reflect.py --write --input payload.json
   python scripts/reflect.py --write --input payload.json --dry-run
+  python scripts/reflect.py --write --input payload.json --decisions-out .reflect_decisions.md
+  python scripts/reflect.py --write --input payload.json --gaslamp-home /custom/path
+
+  # Mode 3: Sandboxed backtest (copies ~/.gaslamp/ to .tmp/ sandbox, no live writes)
+  python scripts/reflect.py --write --input payload.json --backtest <label>
 
 Extract reads gaslamp.md (§5, §6, §9, §11) + memory.md (Discoveries) and
 emits structured JSON to stdout.  Write reads classified JSON from stdin and
 merges it into ~/.gaslamp/{user,lessons,skills}.md with dedup, char-limit
 enforcement, and quarterly archiving.
+
+--gaslamp-home <path>  overrides the default ~/.gaslamp/ target for all writes.
+  Safety note: this is a redirect, not a filesystem lock.  The live tree is
+  protected only by the caller supplying the correct path.
+
+--backtest <label>  copies ~/.gaslamp/ to .tmp/reflect-backtests/<label>/gaslamp/,
+  runs the write against that copy, prints a unified diff, and confirms the
+  live tree was not touched.
+
+--decisions-out <file>  writes a .reflect_decisions.md audit trail of every
+  incoming entry (promoted / category_replaced / dup_skipped / validation_skipped)
+  and every eviction (evicted_to_archive).  Defaults to <cwd>/.reflect_decisions.md
+  when <cwd>/gaslamp.md exists; omitted otherwise.
 """
 
+import difflib
 import hashlib
 import json
 import re
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -174,6 +194,16 @@ def _is_placeholder_section(text: str) -> bool:
     return True  # only noise found
 
 
+def _candidate_id(project_name: str, section: str, text: str) -> str:
+    """Stable id for a candidate: <project>:<section>:<sha8 of text>.
+
+    Deterministic — same project + section + unchanged text always produces
+    the same id.  Used to link payload entries back to the raw candidate.
+    """
+    sha8 = hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+    return f"{project_name}:{section}:{sha8}"
+
+
 def extract_project(project_dir: Path) -> Optional[Dict]:
     """Extract candidates from a single project directory."""
     gaslamp_path = project_dir / "gaslamp.md"
@@ -262,6 +292,10 @@ def extract_project(project_dir: Path) -> Optional[Dict]:
     if not candidates:
         return None
 
+    # Stamp each candidate with a stable id (P1-2)
+    for c in candidates:
+        c["candidate_id"] = _candidate_id(project_name, c["section"], c["text"])
+
     return {
         "project": project_name,
         "project_date": project_date,
@@ -290,6 +324,17 @@ def _content_hash(text: str) -> str:
     return hashlib.sha256(normalised.encode("utf-8")).hexdigest()[:16]
 
 
+def _hash_body(title: str, body: str) -> str:
+    """Dedup hash for an entry, excluding Source-ids metadata lines.
+
+    Source-ids lines are traceability metadata added by P1-2; they must not
+    affect the dedup hash so that entries written with or without source_candidates
+    are correctly detected as duplicates.
+    """
+    clean_lines = [l for l in body.splitlines() if not l.startswith("Source-ids:")]
+    return _content_hash(f"{title}\n" + "\n".join(clean_lines))
+
+
 def _make_front_matter(schema: str, char_count: int) -> str:
     """Generate YAML front-matter block."""
     today = datetime.now().strftime("%Y-%m-%d")
@@ -316,7 +361,7 @@ def _parse_entries(text: str) -> List[Dict]:
             "date": date,
             "title": title,
             "body": body,
-            "hash": _content_hash(f"{title}\n{body}"),
+            "hash": _hash_body(title, body),
         })
     return entries
 
@@ -415,12 +460,16 @@ def _format_lesson_entry(item: dict) -> dict:
     body_parts = [item["body"]]
     if item.get("source"):
         body_parts.append(f"Source: {item['source']}")
+    # Hash computed before Source-ids so dedup is stable across writes with/without ids
+    hash_body = "\n".join(body_parts)
+    if item.get("source_candidates"):
+        body_parts.append(f"Source-ids: {', '.join(item['source_candidates'])}")
     body = "\n".join(body_parts)
     return {
         "date": item.get("date", datetime.now().strftime("%Y-%m-%d")),
         "title": item["title"],
         "body": body,
-        "hash": _content_hash(f"{item['title']}\n{body}"),
+        "hash": _content_hash(f"{item['title']}\n{hash_body}"),
     }
 
 
@@ -442,12 +491,16 @@ def _format_skill_entry(item: dict) -> dict:
         body_parts.append(f"- {step}")
     if item.get("source"):
         body_parts.append(f"Source: {item['source']}")
+    # Hash computed before Source-ids so dedup is stable across writes with/without ids
+    hash_body = "\n".join(body_parts)
+    if item.get("source_candidates"):
+        body_parts.append(f"Source-ids: {', '.join(item['source_candidates'])}")
     body = "\n".join(body_parts)
     return {
         "date": item.get("date", datetime.now().strftime("%Y-%m-%d")),
         "title": item["title"],
         "body": body,
-        "hash": _content_hash(f"{item['title']}\n{body}"),
+        "hash": _content_hash(f"{item['title']}\n{hash_body}"),
     }
 
 
@@ -456,6 +509,38 @@ FORMATTERS = {
     "lessons": _format_lesson_entry,
     "skills": _format_skill_entry,
 }
+
+
+_VALID_PRIORITY = {"low", "medium", "high"}
+_VALID_DURABILITY = {"transient", "recurring", "durable"}
+_VALID_DECISION = {"promote", "keep_project_only"}
+
+
+def _passes_promotion_gate(item: dict) -> tuple[bool, str]:
+    """Return (True, '') if item passes the promotion gate, (False, reason) otherwise.
+
+    Gate fields (priority, durability, decision) are optional — absent fields
+    pass through for backwards compatibility with v1.1 payloads.  When present,
+    all three must satisfy: priority=high AND durability=durable AND decision=promote.
+    """
+    priority = item.get("priority")
+    durability = item.get("durability")
+    decision = item.get("decision")
+
+    if priority is not None and priority not in _VALID_PRIORITY:
+        return False, f"unknown priority={priority!r}"
+    if durability is not None and durability not in _VALID_DURABILITY:
+        return False, f"unknown durability={durability!r}"
+    if decision is not None and decision not in _VALID_DECISION:
+        return False, f"unknown decision={decision!r}"
+
+    if priority is not None and priority != "high":
+        return False, f"priority={priority} (need high)"
+    if durability is not None and durability != "durable":
+        return False, f"durability={durability} (need durable)"
+    if decision == "keep_project_only":
+        return False, "decision=keep_project_only"
+    return True, ""
 
 
 def _validate_item(file_type: str, item: dict) -> List[str]:
@@ -480,12 +565,12 @@ def _validate_item(file_type: str, item: dict) -> List[str]:
     return errors
 
 
-def _ensure_gaslamp_home():
-    """Create ~/.gaslamp/ with README.md if it doesn't exist."""
-    GASLAMP_HOME.mkdir(exist_ok=True)
-    (GASLAMP_HOME / "archive").mkdir(exist_ok=True)
+def _ensure_gaslamp_home(gaslamp_home: Path):
+    """Create gaslamp_home with README.md if it doesn't exist."""
+    gaslamp_home.mkdir(exist_ok=True)
+    (gaslamp_home / "archive").mkdir(exist_ok=True)
 
-    readme_path = GASLAMP_HOME / "README.md"
+    readme_path = gaslamp_home / "README.md"
     if not readme_path.exists():
         readme_path.write_text(
             "# ~/.gaslamp/ — Long-Term Memory for Gaslamp Agents\n\n"
@@ -504,9 +589,16 @@ def _ensure_gaslamp_home():
 
 
 def _evict_oldest(
-    entries: List[Dict], char_limit: int, file_type: str, dry_run: bool
-) -> List[Dict]:
-    """Remove oldest entries until body fits under char_limit. Archive evicted."""
+    entries: List[Dict],
+    char_limit: int,
+    file_type: str,
+    dry_run: bool,
+    gaslamp_home: Path,
+) -> Tuple[List[Dict], List[Dict]]:
+    """Remove oldest entries until body fits under char_limit. Archive evicted.
+
+    Returns (remaining_entries, evicted_entries).
+    """
     evicted = []
     while entries and len(_render_entries(entries)) > char_limit:
         evicted.append(entries.pop(0))  # oldest first (entries are date-sorted)
@@ -518,7 +610,7 @@ def _evict_oldest(
             q = _quarter_for_date(e["date"])
             by_quarter.setdefault(q, []).append(e)
 
-        archive_dir = GASLAMP_HOME / "archive"
+        archive_dir = gaslamp_home / "archive"
         for quarter, quarter_entries in by_quarter.items():
             archive_path = archive_dir / f"{file_type}_{quarter}.md"
             existing = ""
@@ -540,12 +632,12 @@ def _evict_oldest(
                 file=sys.stderr,
             )
 
-    return entries
+    return entries, evicted
 
 
-def _update_index(file_stats: dict[str, dict]):
-    """Write/update ~/.gaslamp/index.json."""
-    index_path = GASLAMP_HOME / "index.json"
+def _update_index(file_stats: dict[str, dict], gaslamp_home: Path):
+    """Write/update gaslamp_home/index.json."""
+    index_path = gaslamp_home / "index.json"
     index = {
         "schema_version": SCHEMA_VERSION,
         "updated": datetime.now().strftime("%Y-%m-%d"),
@@ -556,12 +648,98 @@ def _update_index(file_stats: dict[str, dict]):
     )
 
 
-def write_entries(payload: dict, dry_run: bool = False):
-    """Merge classified entries into ~/.gaslamp/ files."""
+def _write_decisions_md(decisions: List[Dict], out_path: Path, payload: dict, gaslamp_home: Path):
+    """Write a .reflect_decisions.md audit trail for the current write run."""
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    lines = [
+        "# .reflect_decisions.md — Phase 7 Reflection Audit",
+        "",
+        f"Reflected: {today}  ",
+        f"Target: `{gaslamp_home}`",
+        "",
+        "## Incoming Entries",
+        "",
+        "| Title | Type | Action | Reason |",
+        "|-------|------|--------|--------|",
+    ]
+
+    incoming = [d for d in decisions if d["action"] != "evicted_to_archive"]
+    evicted = [d for d in decisions if d["action"] == "evicted_to_archive"]
+
+    for d in incoming:
+        title = d["title"].replace("|", "\\|")
+        reason = d.get("reason", "—").replace("|", "\\|")
+        lines.append(f"| {title} | {d['file_type']} | {d['action']} | {reason} |")
+
+    if not incoming:
+        lines.append("| — | — | — | no entries processed |")
+
+    if evicted:
+        lines += [
+            "",
+            "## Evicted from Memory (char-limit pressure)",
+            "",
+            "| Title | Type | Action | Reason |",
+            "|-------|------|--------|--------|",
+        ]
+        for d in evicted:
+            title = d["title"].replace("|", "\\|")
+            reason = d.get("reason", "evicted to archive/").replace("|", "\\|")
+            lines.append(f"| {title} | {d['file_type']} | evicted_to_archive | {reason} |")
+
+    # Summary counts
+    promoted = sum(1 for d in incoming if d["action"] in ("promoted", "category_replaced"))
+    skipped = sum(1 for d in incoming if d["action"] in ("dup_skipped", "validation_skipped", "gate_blocked"))
+    lines += [
+        "",
+        "## Summary",
+        "",
+        f"- Promoted: {promoted}",
+        f"- Skipped: {skipped}",
+        f"- Evicted: {len(evicted)}",
+    ]
+
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_entries(
+    payload: dict,
+    gaslamp_home: Path = GASLAMP_HOME,
+    dry_run: bool = False,
+    decisions_out: Optional[Path] = None,
+):
+    """Merge classified entries into gaslamp_home/ files.
+
+    gaslamp_home defaults to ~/.gaslamp/ but can be overridden for sandboxed
+    backtest runs.  Safety relies on the caller passing the correct path — there
+    is no filesystem-level lock on the live tree.
+    """
     if not dry_run:
-        _ensure_gaslamp_home()
+        _ensure_gaslamp_home(gaslamp_home)
 
     file_stats = {}
+    decisions: List[Dict] = []
+
+    # Backwards-compat warning: v1.1 payloads omit gate fields; warn once per run
+    all_items = [
+        item
+        for ft in ("user", "lessons", "skills")
+        for item in payload.get(ft, [])
+    ]
+    legacy_count = sum(
+        1 for item in all_items
+        if item.get("priority") is None
+        and item.get("durability") is None
+        and item.get("decision") is None
+    )
+    if legacy_count:
+        print(
+            f"  Note: v1.1 payload detected — gate fields absent for "
+            f"{legacy_count} entr{'y' if legacy_count == 1 else 'ies'} "
+            f"(treating as priority=high/durable/promote)",
+            file=sys.stderr,
+        )
 
     for file_type in ("user", "lessons", "skills"):
         new_items = payload.get(file_type, [])
@@ -579,13 +757,40 @@ def write_entries(payload: dict, dry_run: bool = False):
                     f"{', '.join(errors)}",
                     file=sys.stderr,
                 )
+                decisions.append({
+                    "title": title,
+                    "file_type": file_type,
+                    "action": "validation_skipped",
+                    "reason": "; ".join(errors),
+                })
             else:
                 valid_items.append(item)
         if not valid_items:
             continue
-        new_items = valid_items
 
-        file_path = GASLAMP_HOME / f"{file_type}.md"
+        # P1-1: promotion gate — filter on priority/durability/decision when present
+        gated_items = []
+        for item in valid_items:
+            passes, reason = _passes_promotion_gate(item)
+            if not passes:
+                title = item.get("title", "(no title)")
+                print(
+                    f"  Gate: dropping {file_type} entry {title!r}: {reason}",
+                    file=sys.stderr,
+                )
+                decisions.append({
+                    "title": title,
+                    "file_type": file_type,
+                    "action": "gate_blocked",
+                    "reason": reason,
+                })
+            else:
+                gated_items.append(item)
+        if not gated_items:
+            continue
+        new_items = gated_items
+
+        file_path = gaslamp_home / f"{file_type}.md"
 
         # F-6: user.md uses category-replace logic (not append + SHA dedup)
         if file_type == "user":
@@ -605,10 +810,22 @@ def write_entries(payload: dict, dry_run: bool = False):
                 if cat in existing_by_cat:
                     existing_entries[existing_by_cat[cat]] = entry
                     updated += 1
+                    decisions.append({
+                        "title": cat,
+                        "file_type": "user",
+                        "action": "category_replaced",
+                        "reason": "category updated in-place",
+                    })
                 else:
                     existing_by_cat[cat] = len(existing_entries)
                     existing_entries.append(entry)
                     added += 1
+                    decisions.append({
+                        "title": cat,
+                        "file_type": "user",
+                        "action": "promoted",
+                        "reason": "—",
+                    })
 
             if added == 0 and updated == 0:
                 continue
@@ -653,10 +870,22 @@ def write_entries(payload: dict, dry_run: bool = False):
             entry = formatter(item)
             if entry["hash"] in existing_hashes:
                 skipped += 1
+                decisions.append({
+                    "title": item.get("title", "(no title)"),
+                    "file_type": file_type,
+                    "action": "dup_skipped",
+                    "reason": "sha256 match with existing entry",
+                })
                 continue
             existing_entries.append(entry)
             existing_hashes.add(entry["hash"])
             added += 1
+            decisions.append({
+                "title": item.get("title", "(no title)"),
+                "file_type": file_type,
+                "action": "promoted",
+                "reason": "—",
+            })
 
         if added == 0:
             if skipped:
@@ -669,7 +898,17 @@ def write_entries(payload: dict, dry_run: bool = False):
         existing_entries.sort(key=lambda e: e["date"])
 
         char_limit = CHAR_LIMITS[file_type]
-        existing_entries = _evict_oldest(existing_entries, char_limit, file_type, dry_run)
+        existing_entries, evicted = _evict_oldest(
+            existing_entries, char_limit, file_type, dry_run, gaslamp_home
+        )
+        for e in evicted:
+            quarter = _quarter_for_date(e["date"])
+            decisions.append({
+                "title": e["title"],
+                "file_type": file_type,
+                "action": "evicted_to_archive",
+                "reason": f"archive/{file_type}_{quarter}.md",
+            })
 
         content = _render_file(file_type, existing_entries)
         body_len = len(_render_entries(existing_entries))
@@ -694,8 +933,127 @@ def write_entries(payload: dict, dry_run: bool = False):
         }
 
     if file_stats and not dry_run:
-        _update_index(file_stats)
-        print(f"\n  Updated {GASLAMP_HOME}/index.json", file=sys.stderr)
+        _update_index(file_stats, gaslamp_home)
+        print(f"\n  Updated {gaslamp_home}/index.json", file=sys.stderr)
+
+    # Write decisions file (P0-2); dry-run emits a .preview.md so gate outcomes are visible
+    if decisions:
+        _resolve_and_write_decisions(
+            decisions, payload, gaslamp_home, decisions_out, preview=dry_run
+        )
+
+
+def _resolve_and_write_decisions(
+    decisions: List[Dict],
+    payload: dict,
+    gaslamp_home: Path,
+    decisions_out: Optional[Path],
+    preview: bool = False,
+):
+    """Write .reflect_decisions[.preview].md to the resolved output path.
+
+    Resolution order:
+    1. Explicit --decisions-out path (always honoured; .preview suffix added when preview=True)
+    2. <cwd>/.reflect_decisions[.preview].md when <cwd>/gaslamp.md exists
+    3. Skip — avoids polluting non-project directories
+    """
+    suffix = ".preview.md" if preview else ".md"
+    if decisions_out is not None:
+        # For an explicit path: strip any extension and re-apply correct suffix
+        stem = decisions_out.with_suffix("").name
+        if stem.endswith(".preview"):
+            stem = stem[: -len(".preview")]
+        out_path = decisions_out.parent / (stem + suffix)
+    elif (Path.cwd() / "gaslamp.md").exists():
+        out_path = Path.cwd() / f".reflect_decisions{suffix}"
+    else:
+        return  # not in a project dir and no explicit path
+
+    _write_decisions_md(decisions, out_path, payload, gaslamp_home)
+    tag = "[DRY RUN] " if preview else ""
+    print(f"  {tag}Decisions: {out_path}", file=sys.stderr)
+
+
+# ── Backtest ─────────────────────────────────────────────────────────────────
+
+def _run_backtest(
+    label: str,
+    payload: dict,
+    decisions_out: Optional[Path],
+    gaslamp_home: Path = GASLAMP_HOME,
+):
+    """Copy gaslamp_home/ to a sandbox, run write there, report unified diff.
+
+    Safety: all writes target the sandbox copy only.  The live gaslamp_home
+    tree is never opened for writing during this function.
+    """
+    backtest_root = Path.cwd() / ".tmp" / "reflect-backtests" / label
+    backtest_root.mkdir(parents=True, exist_ok=True)
+    sandbox = backtest_root / "gaslamp"
+
+    # Fresh copy of live tree into sandbox
+    if sandbox.exists():
+        shutil.rmtree(sandbox)
+
+    if gaslamp_home.exists():
+        shutil.copytree(gaslamp_home, sandbox)
+        print(f"  Copied {gaslamp_home} → {sandbox}", file=sys.stderr)
+    else:
+        sandbox.mkdir(parents=True)
+        print(f"  No {gaslamp_home} found — starting from empty sandbox", file=sys.stderr)
+
+    # Snapshot before write
+    target_files = ("user.md", "lessons.md", "skills.md", "index.json")
+    before: dict[str, str] = {}
+    for fname in target_files:
+        p = sandbox / fname
+        before[fname] = p.read_text(encoding="utf-8") if p.exists() else ""
+
+    # Resolved decisions output
+    if decisions_out is not None:
+        bt_decisions_out = decisions_out
+    else:
+        bt_decisions_out = backtest_root / ".reflect_decisions.md"
+
+    print(
+        f"\n  [BACKTEST:{label}] Writing to sandbox: {sandbox}\n",
+        file=sys.stderr,
+    )
+
+    # Run write against sandbox — NOT GASLAMP_HOME
+    write_entries(payload, gaslamp_home=sandbox, dry_run=False, decisions_out=bt_decisions_out)
+
+    # Diff report
+    print("\n── Backtest diff ─────────────────────────────────", file=sys.stderr)
+    any_diff = False
+    for fname in target_files:
+        p = sandbox / fname
+        after_text = p.read_text(encoding="utf-8") if p.exists() else ""
+        if before[fname] == after_text:
+            continue
+        any_diff = True
+        diff = list(difflib.unified_diff(
+            before[fname].splitlines(keepends=True),
+            after_text.splitlines(keepends=True),
+            fromfile=f"before/{fname}",
+            tofile=f"after/{fname}",
+        ))
+        sys.stderr.writelines(diff)
+        print("", file=sys.stderr)
+
+    if not any_diff:
+        print(
+            "  No changes (all entries already present or payload empty).",
+            file=sys.stderr,
+        )
+
+    print(
+        f"\n  Live {gaslamp_home} NOT modified — all writes stayed in {sandbox}",
+        file=sys.stderr,
+    )
+    if bt_decisions_out.exists():
+        print(f"  Decisions: {bt_decisions_out}", file=sys.stderr)
+    print(f"  Backtest artifacts: {backtest_root}", file=sys.stderr)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -747,7 +1105,34 @@ def main():
     if "--write" in args:
         dry_run = "--dry-run" in args
 
-        # Support --input <file> as alternative to stdin piping
+        # --gaslamp-home <path>
+        gaslamp_home = GASLAMP_HOME
+        if "--gaslamp-home" in args:
+            idx = args.index("--gaslamp-home")
+            if idx + 1 >= len(args):
+                print("Error: --gaslamp-home requires a path argument.", file=sys.stderr)
+                sys.exit(1)
+            gaslamp_home = Path(args[idx + 1])
+
+        # --decisions-out <file>
+        decisions_out: Optional[Path] = None
+        if "--decisions-out" in args:
+            idx = args.index("--decisions-out")
+            if idx + 1 >= len(args):
+                print("Error: --decisions-out requires a file path argument.", file=sys.stderr)
+                sys.exit(1)
+            decisions_out = Path(args[idx + 1])
+
+        # --backtest <label>
+        backtest_label: Optional[str] = None
+        if "--backtest" in args:
+            idx = args.index("--backtest")
+            if idx + 1 >= len(args):
+                print("Error: --backtest requires a label argument.", file=sys.stderr)
+                sys.exit(1)
+            backtest_label = args[idx + 1]
+
+        # --input <file>
         input_file = None
         if "--input" in args:
             idx = args.index("--input")
@@ -781,11 +1166,16 @@ def main():
                 print(f"Error: Invalid JSON on stdin: {e}", file=sys.stderr)
                 sys.exit(1)
 
+        if backtest_label:
+            print(f"\n[BACKTEST:{backtest_label}] Sandbox run\n", file=sys.stderr)
+            _run_backtest(backtest_label, payload, decisions_out, gaslamp_home=gaslamp_home)
+            return
+
         label = "[DRY RUN] " if dry_run else ""
-        print(f"\n{label}Reflecting to {GASLAMP_HOME}/\n", file=sys.stderr)
-        write_entries(payload, dry_run=dry_run)
+        print(f"\n{label}Reflecting to {gaslamp_home}/\n", file=sys.stderr)
+        write_entries(payload, gaslamp_home=gaslamp_home, dry_run=dry_run, decisions_out=decisions_out)
         if not dry_run:
-            print(f"\n  Done. Memory updated at {GASLAMP_HOME}/", file=sys.stderr)
+            print(f"\n  Done. Memory updated at {gaslamp_home}/", file=sys.stderr)
         return
 
     # ── Unknown ───────────────────────────────────────────────────────────────
