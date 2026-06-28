@@ -1,16 +1,14 @@
 """
-colab_training.py — Code templates for training on Google Colab via colab-mcp.
+colab_training.py — Code templates for training on Google Colab via google-colab-cli.
 
-Each constant / function returns a Python code string to pass to the
-`execute_code` MCP tool.  The training cell runs the trainer in a background
-thread so execute_code returns immediately; use POLL_CELL to track progress.
+Each constant / function returns a Python code string or template to execute on
+the remote Colab runtime VM using the `colab exec` command.
 
-Typical call sequence:
-    1. execute_code(SETUP_CELL)          # install unsloth, check GPU
-    2. execute_code(VERIFY_CELL)         # smoke-test imports + VRAM
-    3. execute_code(get_training_cell(...))   # start training in background
-    4. loop: execute_code(POLL_CELL)     # monitor until done: true
-    5. execute_code(FINAL_CELL)          # fetch final metrics + adapter path
+Typical CLI workflow:
+    1. colab new -s unsloth-buddy --gpu T4
+    2. colab exec -s unsloth-buddy -f scripts/setup_colab.py
+    3. colab exec -s unsloth-buddy -f train.py
+    4. colab download -s unsloth-buddy /content/outputs/ outputs/
 """
 
 # ── Step 1: Install & GPU check ───────────────────────────────────────────────
@@ -202,37 +200,22 @@ summary = {
 print("FINAL: " + json.dumps(summary))
 """
 
-# ── Colab MCP installation instructions (printed to user) ────────────────────
+# ── Google Colab CLI installation instructions (printed to user) ─────────────
 INSTALL_INSTRUCTIONS = """
-To use Google Colab for training, install colab-mcp in Claude Code:
+To use Google Colab for remote training, install the official Colab CLI:
 
-1. Install Python 3.13 (colab-mcp requires it; keeps your training venv intact):
-     uv python install 3.13
+1. Install the CLI using uv:
+     uv tool install google-colab-cli
 
-2. Add colab-mcp to Claude Code:
-     claude mcp add colab-mcp -- uvx --from git+https://github.com/googlecolab/colab-mcp --python 3.13 colab-mcp
+2. Provision a new remote GPU runtime:
+     colab new -s unsloth-buddy --gpu T4
 
-3. Open ~/.claude.json, find the colab-mcp entry under your project's
-   mcpServers, and make sure it looks like:
-     "colab-mcp": {
-       "command": "uvx",
-       "args": ["--from", "git+https://github.com/googlecolab/colab-mcp",
-                "--python", "3.13", "colab-mcp"],
-       "timeout": 30000
-     }
+3. Run the remote environment setup:
+     colab exec -s unsloth-buddy -f scripts/setup_colab.py
 
-   Note: do NOT add --enable-runtime — proxy mode is correct and
-   --enable-runtime requires a Google OAuth config not publicly available.
+4. Execute your training script from the dated project directory:
+     colab exec -s unsloth-buddy -f train.py
 
-3. Restart Claude Code.
-
-4. Open a new Colab notebook at https://colab.research.google.com
-   and connect to a GPU runtime (Runtime → Change runtime type → T4 GPU).
-
-5. Confirm the MCP tools are available — you should see:
-   - execute_code
-   - open_colab_browser_connection
-
-   Note: "Failed to connect" before opening a Colab notebook is normal.
-   The tools become active once a runtime is connected (Step 4).
+5. Download output model assets back to your local machine:
+     colab download -s unsloth-buddy /content/outputs/ outputs/
 """

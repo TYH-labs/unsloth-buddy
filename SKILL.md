@@ -36,7 +36,7 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 | `scripts/gaslamp_callback.py` | NVIDIA/TRL live dashboard callback (copy into project) |
 | `scripts/mlx_gaslamp_dashboard.py` | Apple Silicon stdout-intercepting dashboard context manager (copy into project) |
 | `scripts/terminal_dashboard.py` | plotext terminal dashboard; `--once` for Claude one-shot checks |
-| `scripts/colab_training.py` | Colab cell generators: `SETUP_CELL`, `VERIFY_CELL`, `get_training_cell()`, `POLL_CELL`, `FINAL_CELL` |
+| `scripts/colab_training.py` | Colab training helpers: code templates (`SETUP_CELL`, `VERIFY_CELL`, `get_training_cell()`) and `INSTALL_INSTRUCTIONS` for `google-colab-cli` |
 | `scripts/setup_colab.py` | Colab environment setup utilities |
 | `scripts/unsloth_mlx_sft_example.py` | **Apple Silicon SFT training template** — copy as `train.py` |
 | `scripts/unsloth_mlx_vision_example.py` | **Apple Silicon vision training template** — copy as `train.py` |
@@ -57,7 +57,8 @@ All scripts and templates are installed alongside this skill. Do NOT `ls` to dis
 | `templates/demo_vlm_crisp.html` | **Vision demo template — crisp-light** (wide layout for images; for consumer/multimodal domains) |
 | `templates/demo_vlm_dark.html` | **Vision demo template — dark-signal** (wide layout for images; for technical/multimodal domains) |
 | `scripts/llamacpp.py` | **llama.cpp unified CLI** — install, quantize, bench, ppl, serve, chat, deploy (one-command auto-pipeline) |
-| `templates/chat_ui.html` | **Gaslamp Chat WebUI** — dark glassmorphism chat interface for local GGUF inference via llama-server |
+| `scripts/litertlm.py` | **LiteRT-LM unified CLI** — install, bundle, serve, chat, deploy (local TensorFlow Lite-based LLM inference) |
+| `templates/chat_ui.html` | **Gaslamp Chat WebUI** — dark glassmorphism chat interface for GGUF/LiteRT local inference |
 
 ## The 7-Phase End-to-End Lifecycle (+Deploy)
 
@@ -166,97 +167,55 @@ Follow the matching path below.
 
 ---
 
-#### Path A: Google Colab (via colab-mcp)
+#### Path A: Google Colab (via google-colab-cli)
 
-Colab gives free GPU access with no local installation. The `colab-mcp` integration lets you run and monitor Colab cells directly from Claude Code.
+Colab gives free GPU/TPU access with no local installation. The official `google-colab-cli` integration lets you provision, run, and monitor training on Colab runtimes directly from your local terminal.
 
-**Step A1 — Install colab-mcp (first time only)**
+**Step A1 — Install Colab CLI**
 
-**First, check whether `execute_code` is available as an MCP tool in the current session.**
-- If `execute_code` IS available → skip to Step A2.
-- If `execute_code` is NOT available → colab-mcp is not installed. Run the install flow below.
-
-**Install for Claude Code (CLI):**
-
+Install the official Colab CLI tool globally or in your environment:
 ```bash
-# 1. (If needed) Install Python 3.13
-uv python install 3.13
-
-# 2. Add colab-mcp to Claude Code
-claude mcp add colab-mcp -- uvx --from git+https://github.com/googlecolab/colab-mcp --python 3.13 colab-mcp
-
-# 3. Verify it was added
-claude mcp list
+uv tool install google-colab-cli
 ```
 
-Open `~/.claude.json`, find the `colab-mcp` entry under your project's `mcpServers`, and ensure it matches:
-```json
-"colab-mcp": {
-  "command": "uvx",
-  "args": ["--from", "git+https://github.com/googlecolab/colab-mcp",
-           "--python", "3.13", "colab-mcp"],
-  "timeout": 30000
-}
+**Step A2 — Provision a GPU Runtime**
+
+Provision a remote T4 GPU runtime:
+```bash
+colab new -s unsloth-buddy --gpu T4
 ```
+You can also choose other runtimes like `A100` or `L4` if your account has credits.
 
-> Note: colab-mcp requires Python ≥ 3.13. `uvx --python 3.13` runs it in an isolated env, keeping your training venv (Python ≤ 3.12 for mlx-tune) untouched. Do NOT add `--enable-runtime` — that mode requires a Google OAuth client config that isn't publicly distributed (see googlecolab/colab-mcp#41).
+**Step A3 — Setup environment on VM**
 
-**3. Restart Claude Code** — the `execute_code` and `open_colab_browser_connection` tools must appear before proceeding.
-
-> Note: colab-mcp connects to a live Colab runtime. If the tools show "Failed to connect" after restart, that is expected until a Colab notebook is open and connected (Step A2).
-
-**Step A2 — Connect to a Colab runtime**
-
-1. Tell the user to open a new notebook at https://colab.research.google.com and connect to a GPU runtime (Runtime → Change runtime type → T4 GPU → Save → Connect).
-2. Call the MCP tool `open_colab_browser_connection`. A browser window opens; the user clicks the auth link. The tool returns `true` when connected.
-
-**Step A3 — Setup: install Unsloth and verify GPU**
-
-Add a code cell with `scripts/colab_training.py::SETUP_CELL` content via `add_code_cell`, then run it with `run_code_cell`.
-
-Parse the output — it prints a JSON line then `SETUP_OK`. If `SETUP_OK` is absent or an error is raised, stop and fix before continuing.
-
-**Step A4 — Verify: smoke-test all packages**
-
-Add a code cell with `scripts/colab_training.py::VERIFY_CELL` content and run it.
-
-The output is a JSON dict with versions and VRAM. Check:
-- `vram_gb >= 6` (T4 = 15 GB, L4 = 22 GB — should pass)
-- All package versions are present
-- Output ends with `VERIFY_OK`
-
-Show the user the GPU name and VRAM, then proceed.
-
-**Step A5 — Generate and start training**
-
-Call `scripts/colab_training.py::get_training_cell(...)` with the parameters from the Phase 1 interview. Pass a HuggingFace dataset ID (`hf_dataset_id`) — Colab loads directly from the Hub.
-
-Add the returned code as a cell via `add_code_cell` and run it. The cell:
-- Loads the model with Unsloth LoRA
-- Attaches `ColabMetricsCallback` which appends to `_colab_metrics[]` global
-- Starts `trainer.train()` in a background daemon thread
-- Prints `TRAINING_STARTED: <json>` immediately and returns
-
-Parse the `TRAINING_STARTED:` line to confirm training began.
-
-**Step A6 — Monitor training loop**
-
-Every 30 seconds, update the poll cell with `scripts/colab_training.py::POLL_CELL` content (or add once and re-run it) via `run_code_cell`.
-
-The output is a line beginning `POLL: <json>` with:
-```json
-{"done": false, "n_logs": 12, "latest_step": 60, "latest_loss": 1.42, "recent": [...], "error": null}
+Upload and run the Colab setup script on the remote VM:
+```bash
+colab exec -s unsloth-buddy -f scripts/setup_colab.py
 ```
+This automatically:
+1. Detects the assigned GPU (T4/L4/A100)
+2. Installs Unsloth and required packages on the VM
+3. Prints a structured JSON status to verify readiness
 
-Report progress to the user each poll. Stop looping when `done: true`. If `error` is non-null, report it and stop.
+**Step A4 — Verify GPU & Packages**
 
-**Step A7 — Fetch final results**
+Verify setup output. Ensure the printed JSON status is `"status": "ready"`.
 
-Add a code cell with `scripts/colab_training.py::FINAL_CELL` content and run it.
+**Step A5 — Generate training script and run**
 
-The output starts with `FINAL: <json>` containing `final_loss`, `total_steps`, and `adapter_files` (paths to `.safetensors` in `/content/outputs/`).
+Assemble your training script as `train.py` inside the dated project directory, containing the SFTTrainer or GRPO configuration.
+Execute the script synchronously inside the remote session:
+```bash
+colab exec -s unsloth-buddy -f train.py
+```
+Because the training runs synchronously on the remote VM, the CLI logs/progress are streamed directly to your terminal.
 
-Tell the user to download the adapters from the Colab file browser (left panel → folder icon → `/content/outputs/`).
+**Step A6 — Retrieve results**
+
+Download the output adapters/checkpoints from the VM to your local project directory:
+```bash
+colab download -s unsloth-buddy /content/outputs/ outputs/
+```
 
 Update `progress_log.md` and `memory.md` with final loss, GPU used, and adapter location.
 
@@ -277,13 +236,13 @@ Only proceed when Stage 2 prints **"READY FOR TRAINING"**.
 
 **Apple Silicon users**: You have two training paths available:
 - **Local mlx-tune** (default) — best for models ≤8B, fast iteration, no internet needed. Use Path C.
-- **Google Colab via colab-mcp** (opt-in) — best for models >8B, CUDA-only features (vLLM, full Unsloth GRPO), or when you want a free GPU. Use Path E. Requires `colab-mcp` configured in MCP settings.
+- **Google Colab via Colab CLI** (opt-in) — best for models >8B, CUDA-only features (vLLM, full Unsloth GRPO), or when you want a free GPU. Use Path E. Requires `google-colab-cli` installed locally.
 
 Ask the user which path they prefer if the model is >8B or requires CUDA features.
 
 ### Phase 4: Code Generation & Execution
 
-**If using Colab (Path A):** Phases A5–A7 above already cover training and monitoring. Skip to Phase 5 once `FINAL_CELL` returns successfully.
+**If using Colab (Path A):** Steps A5–A6 above already cover training and retrieval. Skip to Phase 5 once `colab exec` finishes and adapters are downloaded.
 
 **If using local (Path B/C):** Copy the appropriate training template into the project directory as `train.py`, then customise the top-level config variables — do NOT generate from scratch:
 - **Apple Silicon — SFT/Vision (mlx-tune)**:
@@ -404,11 +363,14 @@ Ask the user their deployment target. Run export commands from within the projec
 
 **→ After Phase 6: update `gaslamp.md`** section 10 (Export — format, why, output path, run command). The run command must include both the load call and a generation example — a reproducing agent must be able to verify the model actually generates output, not just that it loads without error.
 
-### Phase 6.5: Local Deploy & Test (Optional — requires llama.cpp)
+### Phase 6.5: Local Deploy & Test (Optional — requires llama.cpp or LiteRT-LM)
 
+Depending on your model export choice (GGUF/llama.cpp or .litertlm), you can run a local served deploy:
+
+#### Option A: GGUF Deployment (via llama.cpp)
 If llama.cpp is installed (detected in Phase 3 via `detect_system.py`), offer the user a one-command deploy after GGUF export:
 
-> *"GGUF export is ready. Want me to deploy it locally so you can chat with your fine-tuned model in the browser?"*
+> *"GGUF export is ready. Want me to deploy it locally so you can chat with your fine-tuned model?"*
 
 If yes, run the auto-deploy pipeline:
 ```bash
@@ -423,9 +385,7 @@ This single command:
 3. **Starts** an OpenAI-compatible server (`llama-server`) on port 8081
 4. **Opens** the Gaslamp Chat WebUI (`templates/chat_ui.html`) in the browser
 
-The user is chatting with their fine-tuned model within ~60 seconds of saying "yes".
-
-Individual subcommands also available for advanced users:
+Individual subcommands also available:
 ```bash
 python scripts/llamacpp.py install              # install llama.cpp
 python scripts/llamacpp.py quantize --input model.gguf --types q4_k_m q8_0
@@ -435,7 +395,37 @@ python scripts/llamacpp.py serve --model model-q4_k_m.gguf --port 8081
 python scripts/llamacpp.py chat --model model-q4_k_m.gguf
 ```
 
-If llama.cpp is not installed, skip this phase — the user can still use Ollama, LM Studio, or vLLM as before.
+#### Option B: LiteRT-LM Deployment
+If the target format is `.litertlm` (converted via Google AI Edge pipelines), offer the user a LiteRT-LM local server/deploy command. Only use this path when the project already has a TFLite model plus a SentencePiece tokenizer, or an existing `.litertlm` bundle. Standard LoRA adapters, GGUF files, and merged safetensors are not valid LiteRT-LM inputs.
+
+> *".litertlm bundle is ready. Want me to deploy it locally so you can chat with your fine-tuned model?"*
+
+If yes, run the auto-deploy pipeline:
+```bash
+python scripts/litertlm.py deploy \
+  --tflite outputs/model.tflite \
+  --tokenizer outputs/tokenizer.model \
+  --output outputs/model.litertlm
+```
+If the `.litertlm` bundle already exists, serve it directly:
+```bash
+python scripts/litertlm.py serve --model outputs/model.litertlm --port 8082
+```
+
+This single command:
+1. **Bundles** the TFLite model and SentencePiece tokenizer into a `.litertlm` package.
+2. **Starts** a local OpenAI-compatible server wrapping `litert_lm.Engine` on port 8082.
+3. **Opens** the WebUI (`templates/chat_ui.html?port=8082`) in your default browser.
+
+Individual subcommands also available:
+```bash
+python scripts/litertlm.py install              # install litert-lm-api & litert-lm-builder
+python scripts/litertlm.py bundle --tflite model.tflite --tokenizer tokenizer.model --output model.litertlm
+python scripts/litertlm.py serve --model outputs/model.litertlm --port 8082
+python scripts/litertlm.py chat --model outputs/model.litertlm
+```
+
+If neither is installed, skip this phase — the model can still be served via Ollama or vLLM.
 
 **→ After Phase 6.5: update `gaslamp.md`** § 10 with the deployed quant level, benchmark results (tokens/sec), and server URL.
 
@@ -577,47 +567,30 @@ docker run -d -p 8888:8888 -v $(pwd):/workspace/work --gpus all unsloth/unsloth
 ```
 Tell them to access Jupyter Lab at `http://localhost:8888`.
 
-**E. Google Colab via colab-mcp (Remote GPU for Mac Users)**:
+**E. Google Colab via Colab CLI (Remote GPU for Mac Users)**:
 
 This path gives Apple Silicon users (or anyone without a local NVIDIA GPU) access to free Colab GPUs (T4/L4/A100) while keeping the local project structure intact. **Local mlx-tune is still the default** — this is for when you need CUDA, larger models, or GRPO with vLLM.
 
 **Prerequisites:**
-1. Install `uv`: `pip install uv`
-2. Configure colab-mcp in your MCP settings (`.gemini/settings.json` or equivalent):
-```json
-{
-  "mcpServers": {
-    "colab-mcp": {
-      "command": "uvx",
-      "args": ["git+https://github.com/googlecolab/colab-mcp"],
-      "timeout": 30000
-    }
-  }
-}
-```
-3. Google account with Colab access
+1. Install `google-colab-cli` via `uv tool install google-colab-cli`
+2. Google account with Colab access
 
 **Setup steps:**
-1. Use colab-mcp's `execute_code` tool to run `scripts/setup_colab.py` on the Colab VM:
-```python
-# The agent reads setup_colab.py and sends it via execute_code
-from scripts.colab_training import generate_setup_code
-code = generate_setup_code()
-# → execute via colab-mcp execute_code tool
-```
-2. Verify the JSON output shows `"status": "ready"` and a GPU is detected.
-3. Upload your dataset and training script (see Phase 4 Colab workflow).
-4. Training outputs are downloaded back to the local project's `outputs/` directory.
+1. Spin up a new VM session: `colab new -s unsloth-buddy --gpu T4`
+2. Execute setup script: `colab exec -s unsloth-buddy -f scripts/setup_colab.py`
+3. Confirm VM shows ready GPU and Unsloth package installations.
+4. Train script execution from the dated project directory: `colab exec -s unsloth-buddy -f train.py`
+5. Sync adapters back: `colab download -s unsloth-buddy /content/outputs/ outputs/`
 
 **When to suggest this path:**
 - User is on Apple Silicon and needs a model >8B parameters
 - User needs CUDA-exclusive features (vLLM fast inference, FP8 quantization)
 - User wants GRPO with vLLM generation (requires CUDA)
-- User's local machine doesn't have enough RAM for the desired model
+- Agent needs automated workflow on remote cloud GPU without local CUDA setups
 
 **Helper scripts:**
 - `scripts/setup_colab.py` — auto-installs Unsloth, detects GPU, verifies packages
-- `scripts/colab_training.py` — code generators for upload, train, download, and metrics polling
+- `scripts/colab_training.py` — code templates for remote training VM execution
 
 ---
 

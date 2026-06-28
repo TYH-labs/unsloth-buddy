@@ -115,6 +115,19 @@ if "llama-cli" in llamacpp_bins:
     if _ver_out:
         llamacpp_version = _ver_out.splitlines()[0].strip()
 
+# ── LiteRT-LM detection ──────────────────────────────────────────────────────
+litertlm_bins = {}
+for _bin in ["litert-lm", "litert-lm-peek", "litert-lm-builder"]:
+    _path = shutil.which(_bin)
+    if _path:
+        litertlm_bins[_bin] = _path
+litertlm_installed = len(litertlm_bins) > 0
+litertlm_version = ""
+if "litert-lm" in litertlm_bins:
+    _ver_out = run(f"{litertlm_bins['litert-lm']} --version 2>&1")
+    if _ver_out:
+        litertlm_version = _ver_out.splitlines()[0].strip()
+
 # ── Decision logic ────────────────────────────────────────────────────────────
 if is_apple_silicon:
     install_path = "C"   # mlx-tune
@@ -148,6 +161,10 @@ if llamacpp_installed:
     print(f"llama.cpp       : {llamacpp_version or 'installed'} ({len(llamacpp_bins)} binaries)")
 else:
     print(f"llama.cpp       : not installed (optional — run: python {__file__.replace('detect_system.py', 'llamacpp.py')} install)")
+if litertlm_installed:
+    print(f"LiteRT-LM       : {litertlm_version or 'installed'} ({len(litertlm_bins)} binaries)")
+else:
+    print(f"LiteRT-LM       : not installed (optional — run: python {__file__.replace('detect_system.py', 'litertlm.py')} install)")
 print(f"\n→ Recommended install path : {install_path}")
 print(f"→ Recommended Python       : {recommended_python}")
 
@@ -184,6 +201,11 @@ summary = {
         "installed": llamacpp_installed,
         "version": llamacpp_version,
         "binaries": llamacpp_bins,
+    },
+    "litert_lm": {
+        "installed": litertlm_installed,
+        "version": litertlm_version,
+        "binaries": litertlm_bins,
     },
     "install_path": install_path,
     "recommended_python": recommended_python,
