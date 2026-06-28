@@ -26,6 +26,10 @@ DATASET_ID   = "your-dataset-here"
 SYSTEM_PROMPT = "You are a helpful assistant."
 USER_PROMPT = "Describe this image."
 
+# Before running Phase 5, edit DATASET_ID, SYSTEM_PROMPT, USER_PROMPT, and the
+# image/label column mapping below. Use representative held-out validation
+# images that test the project's real visual task and likely edge cases.
+
 # ── 1. Fix Adapter JSON logic ───────────────────────────────────────────────
 def patch_adapter_config(adapter_path):
     """

@@ -322,7 +322,13 @@ Copy the eval template into the project and configure it:
 cp ./scripts/mlx_eval_template.py eval.py   # Apple Silicon
 # or: cp ./scripts/eval_template.py eval.py  # Linux/CUDA
 ```
-Edit the top-level config vars (MODEL_NAME, ADAPTER_PATH, STYLE) to match training, then run **both modes** in sequence:
+Before running it, **read `eval.py` carefully and customise it for this project**:
+- Set the top-level config vars (`MODEL_NAME`, `ADAPTER_PATH`, prompt style, generation settings) to match training.
+- Replace the default `TEST_PROMPTS` / sample selection with 4–8 project-specific held-out test cases. These should come from the project brief, data strategy, validation rows, or realistic user workflows — not generic prompts.
+- Include edge cases that verify the trained behavior: expected format, domain vocabulary, refusal/uncertainty behavior, short vs long inputs, and at least one case likely to expose a regression.
+- For vision eval, map the dataset image/label columns and choose representative validation images before running.
+
+After the test cases are customised, run **both modes automatically** in sequence:
 ```bash
 # 1. Standard batch eval
 python eval.py 2>&1 | tee logs/eval.log
@@ -333,7 +339,7 @@ python eval.py --compare 2>&1 | tee logs/eval_compare.log
 
 **Critical — Apple Silicon / mlx-tune:** `ADAPTER_PATH` in `eval.py` must be the full relative path to the adapters directory (e.g. `"outputs/adapters"`). Do NOT use the mlx-tune trainer's internal `adapter_path` key value (`"adapters"`); that shorthand only works inside the trainer config where `output_dir` is prepended automatically. `FastLanguageModel.from_pretrained(adapter_path=...)` expects the actual path.
 
-Record the qualitative results in `memory.md`.
+Record the exact test cases and qualitative results in `memory.md`.
 
 **→ After Phase 5: update `gaslamp.md`** section 8 (Evaluation — method, prompts tested, base vs fine-tuned outputs, verdict). Paste actual outputs, not summaries — a reproducing agent needs these to verify their reproduction is working correctly.
 
