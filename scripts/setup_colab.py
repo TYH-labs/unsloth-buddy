@@ -1,15 +1,16 @@
 """
 setup_colab.py — Auto-setup Unsloth on a Google Colab VM.
 
-Run this via colab-mcp's execute_code tool to:
+Run this via google-colab-cli to:
 1. Detect the assigned GPU (T4/L4/A100)
 2. Install Unsloth
 3. Verify all ML packages
 4. Print a structured JSON status
 
-Usage (from colab-mcp execute_code):
-    exec(open("setup_colab.py").read())
-    # or paste directly into execute_code
+Usage (using google-colab-cli):
+    colab exec -f scripts/setup_colab.py
+    # or:
+    colab run --gpu T4 scripts/setup_colab.py
 
 Output: JSON dict with keys:
     status: "ready" | "error"
@@ -43,7 +44,7 @@ def detect_gpu():
         import torch
         if torch.cuda.is_available():
             name = torch.cuda.get_device_name(0)
-            vram = torch.cuda.get_device_properties(0).total_mem / (1024**3)
+            vram = torch.cuda.get_device_properties(0).total_memory / (1024**3)
             cuda_ver = torch.version.cuda or "unknown"
             return name, round(vram, 1), cuda_ver
     except ImportError:

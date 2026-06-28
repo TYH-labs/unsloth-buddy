@@ -27,7 +27,9 @@ MAX_SEQ_LEN  = 512
 MAX_TOKENS   = 200
 TEMPERATURE  = 0.7                  # 0.0 = greedy / deterministic
 
-# A few prompts representative of your training domain
+# Replace these before running Phase 5.
+# Use 4-8 held-out prompts that represent the actual task, audience, expected
+# output format, and edge cases from project_brief.md / data_strategy.md.
 TEST_PROMPTS = [
     "What is machine learning?",
     "Write a Python function that reverses a string.",

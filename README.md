@@ -36,7 +36,7 @@
 
 **The self-evolving fine-tuning agent.** It talks like a colleague, learns your setup's quirks over time, and orchestrates the full lifecycle: from data formatting and model selection to training, validation, and deployment.
 
-Runs on NVIDIA GPUs via [Unsloth](https://github.com/unslothai/unsloth), natively on Apple Silicon via [mlx-tune](https://github.com/ml-explore/mlx-lm), and on free cloud GPUs via [colab-mcp](https://github.com/googlecolab/colab-mcp). Part of the [Gaslamp](https://gaslamp.dev/) AI development platform — [docs](https://gaslamp.dev/unsloth).
+Runs on NVIDIA GPUs via [Unsloth](https://github.com/unslothai/unsloth), natively on Apple Silicon via [mlx-tune](https://github.com/ml-explore/mlx-lm), and on free cloud GPUs via [google-colab-cli](https://github.com/googlecolab/google-colab-cli). Part of the [Gaslamp](https://gaslamp.dev/) AI development platform — [docs](https://gaslamp.dev/unsloth).
 
 ---
 
@@ -128,7 +128,7 @@ Eight phases, each scoped to an isolated dated project directory that never touc
 | **5. Evaluation** | Batch tests, interactive REPL, base vs fine-tuned comparison | `logs/eval.log` |
 | **5.5. Demo** | Generates a shareable static HTML page — base vs fine-tuned side-by-side | `demos/<name>/index.html` |
 | **6. Export** | GGUF, merged 16-bit, or Hub push | `outputs/` |
-| **6.5. Local Deploy** | Optional: quantize → bench → serve + Gaslamp Chat WebUI (requires llama.cpp) | `outputs/*.gguf` |
+| **6.5. Local Deploy** | Optional: quantize → bench → serve + Gaslamp Chat WebUI (requires llama.cpp or LiteRT-LM) | `outputs/*.gguf` |
 | **7. Reflect** | Synthesizes lessons, gotchas, and recipes into `~/.gaslamp/` for future projects | `~/.gaslamp/` |
 
 ```
@@ -151,7 +151,7 @@ customer_faq_sft_2026_03_17/
 | NVIDIA T4 (16 GB) | `unsloth` | 7B QLoRA, small-scale GRPO |
 | NVIDIA A100 (80 GB) | `unsloth` | 70B QLoRA, 14B LoRA 16-bit |
 | Apple M1 / M2 / M3 / M4 | `mlx-tune` / `mlx-vlm` / `trl` | SFT/DPO: 7B on 10 GB, 13B on 24 GB; Vision SFT via `mlx-vlm`; GRPO: 1–7B via TRL + PyTorch MPS |
-| Google Colab (T4/L4/A100) | `unsloth` via `colab-mcp` | Free cloud GPU, opt-in |
+| Google Colab (T4/L4/A100) | `unsloth` via `google-colab-cli` | Free cloud GPU, opt-in |
 
 Unsloth is ~2× faster than standard HuggingFace training, uses up to 80% less VRAM, and produces exact gradients.
 
@@ -218,20 +218,33 @@ python scripts/llamacpp.py chat --model model-q4_k_m.gguf
 
 Requires [llama.cpp](https://github.com/ggml-org/llama.cpp) — installed automatically via `llamacpp.py install`.
 
+For on-device TFLite models, [LiteRT-LM](https://github.com/nicholasgasior/litert-lm) is also supported:
+
+```bash
+python scripts/litertlm.py install              # install litert-lm-api & litert-lm-builder
+python scripts/litertlm.py deploy --tflite model.tflite --tokenizer tokenizer.model --output model.litertlm
+python scripts/litertlm.py serve --model model.litertlm
+```
+
+LiteRT-LM is a deploy target for models already converted to TFLite with a SentencePiece tokenizer. Standard LoRA adapter, GGUF, and merged safetensors exports should use the matching deploy path instead.
+
 ---
 
 ## Google Colab Training
 
 Apple Silicon users who need larger models or CUDA-only features can offload training to a free Colab GPU:
 
-1. Install `colab-mcp` in Claude Code:
+1. Install the official Colab CLI:
    ```bash
-   uv python install 3.13
-   claude mcp add colab-mcp -- uvx --from git+https://github.com/googlecolab/colab-mcp --python 3.13 colab-mcp
+   uv tool install google-colab-cli
    ```
-2. Open a Colab notebook, connect to a T4/L4 GPU runtime
-3. The agent connects, installs Unsloth, starts training in a background thread, and polls metrics every 30s
-4. Download adapters from the Colab file browser when done
+2. Provision a named GPU runtime: `colab new -s unsloth-buddy --gpu T4`
+3. Run setup and training on the remote VM:
+   ```bash
+   colab exec -s unsloth-buddy -f scripts/setup_colab.py
+   colab exec -s unsloth-buddy -f train.py
+   ```
+4. Download adapters: `colab download -s unsloth-buddy /content/outputs/ outputs/`
 
 Local mlx-tune remains the default — Colab is opt-in for when you need more power.
 
@@ -274,6 +287,7 @@ This works through a local `~/.gaslamp/` memory directory (never committed to yo
 
 ## Changelog
 
+- **2026-06-28** — Added **LiteRT-LM support** (Phase 6.5): `scripts/litertlm.py` provides 5 subcommands (`install`, `bundle`, `serve`, `chat`, `deploy`) for on-device TFLite LLM inference. Migrated Google Colab integration from `colab-mcp` to the official [google-colab-cli](https://github.com/googlecolab/google-colab-cli).
 - **2026-04-14** — **Self-evolving memory** (Phase 7 + global inject): after each project, the agent synthesizes lessons, model-specific gotchas, and reusable scenario recipes into `~/.gaslamp/`. Every new project injects a frozen snapshot at startup and silently applies past knowledge. Implements the Frozen Snapshot pattern from agent memory research. See `ref/self_evolve_plan.md`.
 - **2026-04-12** — Added **llama.cpp local deploy** (Phase 6.5): after GGUF export, if llama.cpp is installed, the agent offers a one-command pipeline — quantize → benchmark → serve + open the Gaslamp Chat WebUI (`templates/chat_ui.html`). `scripts/llamacpp.py` provides 7 subcommands (`install`, `quantize`, `bench`, `ppl`, `serve`, `chat`, `deploy`); auto-selects GPU offload on Apple Silicon (Metal) and NVIDIA. `scripts/detect_system.py` now detects llama.cpp binaries and prints an install hint if missing.
 - **2026-04-10** — Added native **Vision SFT for Apple Silicon**: Integrated [mlx-vlm](https://github.com/Blaizzy/mlx-vlm) to support multimodal fine-tuning (e.g. Gemma 4 Vision, Qwen2.5-VL) on M-series chips. Added `scripts/unsloth_mlx_vision_example.py` training template and `mlx_eval_vision_template.py` for comparative vision evaluation. Demo Builder now supports wide-format VLM layouts (`vlm-crisp`, `vlm-dark`) and relative PNG asset packaging for offline-portable multimodal dashboards.

@@ -132,6 +132,10 @@ packages = {
     "safetensors":     check_pkg("safetensors"),
     "huggingface_hub": check_pkg("huggingface_hub"),
 }
+optional_deploy_packages = {
+    "litert_lm":        check_pkg("litert_lm"),
+    "litert_lm_builder": check_pkg("litert_lm_builder"),
+}
 
 # ── HF cache & disk ───────────────────────────────────────────────────────────
 hf_cache     = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface")) / "hub"
@@ -210,6 +214,13 @@ for pkg, ver in packages.items():
     flag   = "" if ver else f"  ← {install_hint.format(pkg=pkg)}"
     print(f"  {pkg:<20}: {status}{flag}")
 
+print(f"\nOptional deploy packages:")
+for pkg, ver in optional_deploy_packages.items():
+    status = ver or "not installed"
+    pkg_install = "litert-lm-api" if pkg == "litert_lm" else "litert-lm-builder"
+    flag = "" if ver else f"  ← optional: {install_hint.format(pkg=pkg_install)}"
+    print(f"  {pkg:<20}: {status}{flag}")
+
 print(f"\nHF cache        : {'OK' if hf_cache_ok else 'MISSING'}  ({hf_cache})")
 print(f"Disk free       : {disk_free_gb} GB")
 
@@ -234,6 +245,7 @@ summary = {
     "backend": backend,
     "versions": {"unsloth": unsloth_ver, "mlx_tune": mlx_tune_ver, "mlx": mlx_ver,
                  "torch": torch_ver, **packages},
+    "optional_deploy_versions": optional_deploy_packages,
     "cuda_available": cuda_avail, "mps_available": mps_avail,
     "hf_cache": str(hf_cache), "hf_cache_ok": hf_cache_ok,
     "disk_free_gb": disk_free_gb,
